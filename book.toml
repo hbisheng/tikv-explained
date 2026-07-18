@@ -1,0 +1,23 @@
+[book]
+authors = ["Bisheng Huang"]
+language = "en"
+multilingual = false
+src = "src"
+title = "TiKV Explained: Mental Models and Mechanisms"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/hbisheng/tikv-explained"
+edit-url-template = "https://github.com/hbisheng/tikv-explained/edit/main/{path}"
+site-url = "/tikv-explained/"
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.print]
+enable = true
+
