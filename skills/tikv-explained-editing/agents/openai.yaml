@@ -1,0 +1,4 @@
+interface:
+  display_name: "TiKV Explained Editing"
+  short_description: "Rules for editing the TiKV book"
+  default_prompt: "Use $tikv-explained-editing when editing the TiKV Explained book."
