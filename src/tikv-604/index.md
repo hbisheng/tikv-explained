@@ -1,0 +1,125 @@
+# TiKV 604: RocksDB Details
+
+[TiKV 403](../tikv-403/index.md) introduced RocksDB as TiKV's local key-value store. This chapter looks at how RocksDB turns a stream of writes into durable sorted files, then reorganizes those files so that reads remain efficient.
+
+## From Memory to SST Files
+
+A new RocksDB write first enters a **memtable**, a sorted in-memory table. When the memtable fills, it becomes immutable and is flushed to disk as an **SST file**.
+
+For TiKV's usual `default` and `write` column families, `write-buffer-size` sets the memtable size to 128 MiB by default.
+
+```text
+writes
+  |
+  v
+active memtable
+  |
+  | full
+  v
+immutable memtable
+  |
+  | flush
+  v
+SST file in L0
+```
+
+RocksDB normally keeps one active memtable. It can keep several filled memtables waiting to flush; `max-write-buffer-number` controls the limit, which is five by default in TiKV's main KV RocksDB.
+
+`min-write-buffer-number-to-merge` controls whether several immutable memtables are merged before one flush. Its default is one, so RocksDB normally flushes each memtable without merging it with another.
+
+## Why Compaction Exists
+
+An SST file is sorted, but a sequence of flushes creates many files. The same user key can appear in multiple files as it is updated over time. Looking up one key would become expensive if RocksDB had to inspect every file forever.
+
+**Compaction** merges files, keeps the versions that are still needed, and writes replacement SST files. It is how RocksDB trades background write work for efficient reads.
+
+RocksDB organizes SST files into levels. L0 receives new files from memtable flushes. L0 files may overlap in key range because they were created at different times. Deeper levels are kept mostly non-overlapping, which lets a point lookup usually check at most one file per level.
+
+```text
+memtable flushes -> L0 -> L1 -> L2 -> ... -> L6
+                    overlapping      mostly non-overlapping
+```
+
+By default, four L0 files trigger compaction. The threshold is controlled by `level0-file-num-compaction-trigger`.
+
+## Level Capacity and the Base Level
+
+Each level has a target capacity. For the usual `default` and `write` column families, `max-bytes-for-level-base` sets the base-level target to 512 MiB by default. The lock column family uses a smaller target.
+
+`max-bytes-for-level-multiplier` sets the growth factor between deeper levels. Its default is 10. If L4 is the base level, the targets are roughly:
+
+```text
+L4: 512 MiB
+L5:   5 GiB
+L6:  50 GiB
+```
+
+With `dynamic-level-bytes` enabled by default, RocksDB chooses the base level from the bottom up according to the database's current size. The decision also considers compactions already in progress.
+
+For a small database, RocksDB may choose L6 as the base level and compact directly from L0 to L6. Sending data through each empty intermediate level would create unnecessary read and write amplification.
+
+## Choosing Compaction Files
+
+RocksDB first chooses the level under the most pressure, then selects a **seed file**. The seed's key range determines the initial compaction input.
+
+The range often needs to grow:
+
+1. If adjacent input SSTs contain other versions of the same user key, RocksDB includes them. This creates a **clean cut**: all relevant versions of one user key stay in the same compaction.
+2. RocksDB includes every file in the output level that overlaps the resulting key range.
+3. It may add nearby input files when doing so does not expand the key range or add more output overlap.
+
+```text
+input level:   [ seed ][ more versions of the same key ]
+output level:          [ overlapping SST ][ overlapping SST ]
+                   \________ one compaction range ________/
+```
+
+These rules prevent a compaction from producing files with an incomplete or inconsistent view of a user key's version chain.
+
+## Compaction Concurrency
+
+One compaction job runs by default. RocksDB can run several jobs when it has background-task capacity and can find non-conflicting candidates. `max-background-jobs` caps the combined background concurrency for flushes and compactions.
+
+Two compactions cannot use the same SST file. RocksDB therefore chooses disjoint input and output ranges for concurrent jobs.
+
+An L0-to-base-level compaction can sometimes be split into key ranges and run as **subcompactions**. `max-sub-compactions` controls this parallelism. TiKV's main RocksDB uses three by default.
+
+## Output SST Size
+
+Compaction output should not be too fragmented, but one very large SST is also inconvenient to move and read. TiKV's **compaction guard** controls this output granularity.
+
+`compaction_guard_min_output_file_size` is 8 MiB by default. It prevents Region boundaries from producing many tiny SST files. `compaction_guard_max_output_file_size` is 128 MiB by default and keeps output SST files near that size when possible.
+
+For the usual `default` and `write` column families with the guard enabled, L1 and deeper compactions can be understood as producing SST files on the order of 128 MiB.
+
+## Prefix Seeks in the Write CF
+
+TiKV's MVCC versions share one raw user key and differ by timestamp. A point lookup often needs only that one version chain, not the next user key.
+
+A **prefix seek** restricts an iterator to keys with one prefix. In the `write` CF, the useful prefix is the raw user key, not the whole MVCC key. TiKV must remove the timestamp suffix when defining the prefix; otherwise, different versions of the same key look like different prefixes.
+
+This also lets a prefix Bloom filter answer the useful question: does this raw key have any versions in this SST?
+
+## Grouping Concurrent Writes
+
+Raftstore's apply context gathers key-value changes into a `WriteBatch`, then calls RocksDB's `write_opt()` once for the batch.
+
+Under high write concurrency, RocksDB places writers in a `WriteThread` queue. It chooses one writer as the leader, gathers compatible writers into a **write group**, appends their WAL records in order, and assigns sequence numbers for the group.
+
+`max_write_batch_group_size_bytes` limits this opportunistic batching to 1 MiB by default.
+
+```text
+many writers
+    |
+    v
+WriteThread queue
+    |
+    v
+leader forms a write group
+    |
+    +-- one ordered WAL append
+    +-- sequence numbers for the group
+    +-- conditional parallel memtable insertion
+```
+
+The normal TiKV write path is therefore sequential WAL group commit followed by conditionally parallel memtable insertion. This gives RocksDB a single ordered durable log while still allowing several writers to update the in-memory table efficiently.

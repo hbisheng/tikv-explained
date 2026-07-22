@@ -1,0 +1,160 @@
+# TiKV 605: Coprocessor Operators
+
+SQL talks about tables, rows, indexes, and joins. TiKV stores ordered key-value pairs. The coprocessor is where a query's table and index scans become operations over those keys.
+
+## Tables and Rows Become Keys
+
+TiDB encodes a table's identity and a row ID into the key. The value stores the row's column values.
+
+```text
+table key:  table_id + row_id
+value:      encoded row values
+```
+
+This is simplified, but it gives the important shape: table rows are ordered by their row IDs in TiKV's key space. A table scan is therefore a range scan over the table's row-key range.
+
+## Indexes Also Become Keys
+
+An index needs to locate rows from indexed column values. TiDB puts the index value into the key so that equal or nearby values are stored together.
+
+For a unique index, the key identifies the index value and the value stores the row ID:
+
+```text
+index key:  index_value
+value:      row_id
+```
+
+For a non-unique index, several rows can have the same index value. The row ID is therefore part of the key:
+
+```text
+index key:  index_value + row_id
+value:      ...
+```
+
+Keys are ordered, so an index range scan starts with a `seek` and moves forward until it reaches the end of the requested range. A non-unique lookup naturally scans a range because one index value can map to many row IDs. A unique index can still need a range scan when the query asks for a value interval instead of one exact value.
+
+## Executors Pull Data
+
+A coprocessor task runs a chain of DAG executors against one snapshot. The outermost executor asks its child for rows. That request keeps moving down until a scan executor reads keys from RocksDB.
+
+```text
+aggregate pulls from filter
+filter pulls from scan
+scan reads keys from RocksDB
+```
+
+The reader shapes below describe the scans at the bottom of this executor chain.
+
+## Three Reader Shapes
+
+TiDB chooses reader operators according to the data the query needs. The scan parts of these readers run in TiKV's coprocessor.
+
+### TableReader
+
+A `TableReader` performs a `TableFullScan`. It walks table-row keys and returns the rows in the requested range.
+
+### IndexReader
+
+An `IndexReader` performs an `IndexRangeScan`. It is enough when the index contains every value needed by the query. This is often called a **covering index** because TiDB does not need to read the table rows afterward.
+
+### IndexLookup
+
+An `IndexLookup` has two steps:
+
+1. `IndexRangeScan` finds matching row IDs from the index.
+2. `TableRowIDScan` fetches the table rows for those row IDs.
+
+The second step is called a table lookup or a back-to-table read. It is necessary when the index can find a row but does not contain all the columns requested by the query.
+
+```text
+IndexRangeScan -> row IDs -> TableRowIDScan -> full rows
+```
+
+## Joins Use These Scans
+
+A join matches rows from two inputs, for example orders with their users. The query plan chooses a strategy based on the available indexes and the expected number of rows.
+
+In a **HashJoin**, one input is scanned into an in-memory hash table. Rows from the other input probe that hash table for matching join keys. Either input may use a table scan or index scan to supply its rows.
+
+In an **IndexJoin**, TiDB scans the outer input one row at a time. For each outer row, it uses the join key to look up matching rows through an index on the inner input.
+
+```text
+HashJoin:  scan one input -> build hash table -> scan and probe the other
+IndexJoin: scan outer rows -> index lookup on inner for each row
+```
+
+TiKV's coprocessor performs the table and index scans close to the data. TiDB builds the overall query plan and combines the scan results into higher-level operations such as joins.
+
+## Yield Points Bound a Time Slice
+
+Cop tasks run on the cooperative YATP executor described in [TiKV 705: YATP Internals](../tikv-705/index.md). A worker cannot preempt a task in the middle of a poll. The task must reach a **yield point** before another task can run on that worker.
+
+Key scanning uses synchronous RocksDB reads and has no internal async yield point. The cop executor decides when to stop scanning and yield.
+
+`ScanExecutor` yields after it finishes a range or after it retrieves 32 rows. If one row takes 10 ms to fetch, one time slice can therefore stretch to about 320 ms. This is why slow storage reads can affect read-pool latency even when the executor is cooperative.
+
+## Seek and Next
+
+Range scans prefer `next()`: after returning one key, the next key is often nearby. A `seek()` jumps to a specific key and is more expensive because RocksDB must position its internal iterators across memtables and SST files.
+
+TiKV may use more seeks in two common cases:
+
+- An index lookup returns many row IDs, causing many back-to-table reads at unrelated keys.
+- A scan encounters many MVCC versions of one user key. After trying a few `next()` steps, it can seek past versions that cannot be visible to the read timestamp.
+
+At the RocksDB level, positioning an iterator combines entries from memtables and SST files in a merged view. A seek is not a single file lookup.
+
+## Cop Task Time Breakdown
+
+A cop task has several useful timing boundaries:
+
+1. Request parsing and in-memory lock checks happen first. They are not separately tracked and are usually short.
+2. `schedule_wait_time` is the time from spawning the task until a read-pool worker picks it up.
+3. `snapshot_wait_time` is the time from that first poll until snapshot acquisition completes.
+4. `handler_build_time` is the time to construct the handler and executor chain. The builder lives in `parse_request_and_check_memory_locks_impl`.
+5. `item_suspend_time` is the time between polls after a task yields.
+6. `item_process_time` is the active time spent in one poll.
+
+One cop task can be polled many times. Its suspend time can be larger than its total queue wait because it also includes waits introduced after the task has yielded, including concurrency and resource limiting.
+
+## Concurrency and Resource Limits
+
+`server.end_point_max_concurrency` limits concurrent coprocessor work. Its default is the CPU core count. A task above that limit waits before it can scan.
+
+This wait is recorded through `total_suspend_time` in TiKV logs rather than as ordinary read-pool schedule wait.
+
+The limiting path is layered:
+
+```text
+resource limiter -> concurrency limiter -> cop scan
+```
+
+Resource control can reject or delay work before the concurrency limiter. The concurrency limiter then bounds how much cop work reaches the scan executor.
+
+## Reading Cop Metrics
+
+The unified read-pool wait metric measures one queue wait: from one enqueue until a worker starts that scheduled run. It is not the task's total waiting time. A task that yields and is scheduled again accumulates another queue wait each time; its total is the sum of those waits.
+
+A rise in sampled running tasks does not by itself prove that every worker is saturated. It can also mean that many long-running tasks happened to be active at the sample point.
+
+The coprocessor metrics separate broader request time from task internals:
+
+- **Request duration** is wall time from receiving one cop request until completion.
+- **Handle duration** is time spent processing the cop task.
+- **Wait time** includes schedule wait and snapshot wait.
+
+Cop wait time does not include the suspend time between later task polls.
+
+## MVCC and RocksDB Iterator Statistics
+
+TiKV's MVCC statistics usually focus on the `write` CF:
+
+- `total_process_keys` counts useful keys produced by iterator movement.
+- `total_keys` counts iterator operations such as `seek`, `next`, and `prev`.
+
+RocksDB reports different physical iterator statistics across all column families:
+
+- `delete_skipped_count` counts RocksDB tombstones skipped by the iterator. A TiKV MVCC `Delete` record is still a concrete record, not a RocksDB tombstone for this metric.
+- `key_skipped_count` includes normal movement past the previously returned key as well as internal keys hidden by overwrites, deletes, or tombstones.
+
+`key_skipped_count` should not be read as the number of TiKV MVCC versions skipped by tombstones. The TiKV and RocksDB counters describe different layers of the read path.

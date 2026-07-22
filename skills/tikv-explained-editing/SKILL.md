@@ -15,6 +15,7 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 ## Writing
 
 - Follow the 101 style: cut to the chase, direct, succinct.
+- Start from the problem and first principles. Explain why before how, introduce concepts one at a time, and do not assume knowledge not established in earlier chapters.
 - Show only what is necessary for the reader's current level.
 - Explain in logical order, one step at a time.
 - Do not introduce unfamiliar terms before they are needed; define important terms near first use.

@@ -1,0 +1,85 @@
+# TiKV 702: Slow Score
+
+TiKV needs to detect when a store's Raftstore path is slow. A slow store may delay proposals, batching, or Raft-log persistence even when it is still alive.
+
+**Slow score** turns repeated latency probes into one number that PD can use as a health signal.
+
+## One Latency Probe
+
+Every `inspect_interval`, 100 ms by default, TiKV sends a latency-inspection request into Raftstore. The probe measures the time through:
+
+```text
+propose wait -> batch wait -> append log complete
+```
+
+The probe carries a callback. If the next probe is sent before the previous callback finishes, the earlier probe is counted as a timeout.
+
+This is important: a timeout does not require a process crash. It means the Raftstore path failed to finish one inspection round in time.
+
+## Updating the Score
+
+TiKV groups 30 inspection ticks into one round by default. At the end of the round, it updates slow score.
+
+- If the round contains timeouts, the score grows exponentially, up to doubling in one update.
+- If timed-out requests exceed `ratio_thresh`, 10% by default, the update doubles the score.
+- If the round has no timeouts, the score decreases linearly.
+
+The default linear decay takes the score from 100 down to 1 within `min_ttr`, five minutes by default.
+
+```text
+timeouts in a round -> score rises quickly
+no timeouts         -> score falls gradually
+```
+
+The key configuration parameters are:
+
+```text
+inspect_interval = 100 ms
+round_ticks = 30
+ratio_thresh = 10%
+min_ttr = 5 min
+```
+
+## From the PD Worker to Raftstore
+
+The implementation has a periodic path:
+
+```text
+PD worker
+  |
+  | Task::InspectLatency
+  v
+handle_inspect_latency
+  |
+  | tick health reporter and slow score
+  | detect callbacks that did not finish
+  v
+StoreMsg::LatencyInspect(callback)
+  |
+  v
+Raftstore append-log path
+  |
+  v
+callback: inspector.finish()
+```
+
+On the normal path, `inspector.finish()` runs after log append. It records the Raftstore duration through `record_raftstore_duration` and feeds the observation into slow score.
+
+The three functions that define the score's behavior are:
+
+- `tick()` advances the round and updates the score.
+- `record()` records a completed probe.
+- `record_timeout()` records a missed probe.
+
+The score itself changes in `tick()`, where a completed round is evaluated.
+
+## Busy Apply Is a Different Signal
+
+Slow score measures the Raftstore probe path. A Region can also be busy because it is applying committed entries to the KV engine.
+
+TiKV considers the apply side healthy enough to provide service only when busy Regions satisfy both limits:
+
+- fewer than 1% of Regions are busy applying;
+- fewer than 10 Regions are busy applying in absolute count.
+
+These limits prevent a small store from hiding a meaningful apply backlog behind only a percentage, and prevent a large store from treating a large absolute backlog as harmless because it is a small fraction.
