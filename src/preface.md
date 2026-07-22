@@ -1,19 +1,5 @@
 # Preface
 
-This book is my way of explaining TiKV.
+The purpose of this book is simple: to help you build a systematic understanding of TiKV. That means building a mental model that truly reflects its internal mechanisms.
 
-TiKV is not only a codebase. It is a collection of mechanisms: range partitioning, replication, scheduling, transactions, storage engines, batching, recovery, and many careful choices around failure.
-
-The goal of this book is not to list every implementation detail. The goal is to build the mental models that make the details readable.
-
-The intended reader is someone who wants to understand TiKV gradually:
-
-- first as a distributed key-value system,
-- then as a set of interacting components,
-- then as concrete mechanisms,
-- and eventually as code-level behavior.
-
-Many chapters will use diagrams and Rust-shaped pseudocode. Real code appears only when it helps the reader find the implementation or understand a mechanism precisely.
-
-This book is allowed to grow in public. A chapter marked as draft is still part of the map.
-
+**The book prioritizes understanding**. The chapters start with the most accessible ideas and gradually build toward concepts that require more background. Think of it as climbing a mountain, one level at a time. Don't be daunted by its height. This book will guide you every step of the way.

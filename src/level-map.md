@@ -1,32 +1,17 @@
 # Level Map
 
-This book is organized by understandability, not by source-code directory.
+<img src="images/level-map.png" alt="TiKV Explained level map" class="level-map-image">
 
-Each level should give the reader a complete view at that height. A reader can stop after a level and still leave with something real.
+<div class="level-map-table-marker"></div>
 
-## Level 1: First View
-
-What TiKV is, why it exists, and what problem it solves.
-
-## Level 2: System Shape
-
-The major components: TiDB, TiKV, PD, Regions, replicas, leaders, followers, and scheduling.
-
-## Level 3: Request Flow
-
-How reads and writes enter the system and move through the major layers.
-
-## Level 4: Core Ideas
-
-Raft, RocksDB, MVCC, snapshot isolation, and basic transaction flow.
-
-## Level 5: Practical Mechanisms
-
-Raftstore, apply flow, snapshots, coprocessor, compaction, and more detailed transaction behavior.
-
-## Level 6+
-
-Real TiKV mechanisms: batching, peer lifecycle, split, merge, hibernate regions, flow control, resource control, and failure recovery.
-
-The mountain metaphor belongs here: the book is a climb, but the title should stay approachable.
-
+| Level | Topics |
+|---|---|
+| Level 1 (Orientation) | [TiKV 101: What is TiKV](tikv-101/what-is-tikv.md) |
+| Level 2 (Ecosystem) | [TiKV 201: The TiDB ecosystem](tikv-201/the-tidb-ecosystem.md) |
+| Level 3 (Architecture) | [TiKV 301: TiKV Architecture](tikv-301/tikv-architecture.md) |
+| Level 4 (Fundamental) | **Raft**<br>[TiKV 401: Raft Crash Course](tikv-401/raft-crash-course.md)<br><br>**Raftstore**<br>TiKV 402: Single Region<br><br>**KV Engine**<br>TiKV 403: RocksDB Introduction<br><br>**Transaction**<br>TiKV 404: Transaction Introduction |
+| Level 5 (Data Flow) | **Raftstore**<br>TiKV 501: Multi Region & Write Flow<br>TiKV 502: Linearizable Read<br><br>**Coprocessor**<br>TiKV 503: Coprocessor Introduction |
+| Level 6 (Core Mechanism) | **Raftstore**<br>TiKV 601: Batch System<br><br>**Raft**<br>TiKV 602: Leader Transfer<br>TiKV 603: Snapshot<br><br>**KV Engine**<br>TiKV 604: RocksDB Details<br><br>**Coprocessor**<br>TiKV 605: Details<br><br>**Transaction**<br>TiKV 606: Details |
+| Level 7 (Detailed) | **Raftstore**<br>TiKV 701: Split Process<br>TiKV 702: Slow Score<br>TiKV 703: Region Worker<br><br>**KV Engine**<br>TiKV 704: Titan<br><br>**Coprocessor**<br>TiKV 705: YATP Internals |
+| Level 8 (Advanced) | **Raftstore**<br>TiKV 801: Merge Process<br><br>**KV Engine**<br>TiKV 802: GC and Compaction Filter<br><br>**Transaction**<br>TiKV 803: Async Commit, 1PC |
+| Level 9 (Peak) | **Raftstore**<br>TiKV 901: Peer Lifecycle |

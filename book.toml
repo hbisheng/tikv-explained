@@ -13,6 +13,8 @@ create-missing = false
 git-repository-url = "https://github.com/hbisheng/tikv-explained"
 edit-url-template = "https://github.com/hbisheng/tikv-explained/edit/main/{path}"
 site-url = "/tikv-explained/"
+additional-css = ["theme/custom.css"]
+no-section-label = true
 
 [output.html.fold]
 enable = true
@@ -20,4 +22,3 @@ level = 1
 
 [output.html.print]
 enable = true
-
