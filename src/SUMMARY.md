@@ -19,8 +19,8 @@
 
 - [TiKV 401: Raft Crash Course](tikv-401/index.md)
 - [TiKV 402: The Raft Event Loop](tikv-402/index.md)
-- [TiKV 403: RocksDB as a Local KV Store](tikv-403/index.md)
-- [TiKV 404: Transactions](tikv-404/index.md)
+- [TiKV 403: A Quick RocksDB Intro](tikv-403/index.md)
+- [TiKV 404: Transaction Intro](tikv-404/index.md)
 
 # Level 5: Data Flow
 

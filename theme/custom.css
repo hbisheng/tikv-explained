@@ -1,15 +1,14 @@
-.level-map-image,
-.level-map-table-marker + .table-wrapper {
-    width: 90%;
-    max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
+.content main:has(.level-map-image) {
+    width: calc(100% - 2rem);
+    max-width: 1180px;
 }
 
 .level-map-image {
     display: block;
+    float: left;
+    width: min(49%, 560px);
     height: auto;
-    margin-bottom: 1.25rem;
+    margin: 0;
 }
 
 .architecture-layer-image {
@@ -41,10 +40,24 @@
     width: 100%;
 }
 
-@media (max-width: 720px) {
+.level-map-table-marker + .table-wrapper {
+    float: right;
+    width: 49%;
+    max-width: 100%;
+    margin: 0;
+}
+
+@media (max-width: 900px) {
+    .content main:has(.level-map-image) {
+        width: auto;
+        max-width: var(--content-max-width);
+    }
+
     .level-map-image,
     .level-map-table-marker + .table-wrapper {
+        float: none;
         width: 100%;
+        margin-bottom: 1.25rem;
     }
 
     .architecture-layer-image {

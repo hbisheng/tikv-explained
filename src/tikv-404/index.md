@@ -1,39 +1,44 @@
-# TiKV 404: Transactions
+# TiKV 404: Transaction Intro
 
-A transaction is a group of reads and writes that must be treated as one logical action. For example, transferring money between two accounts must either update both balances or leave both unchanged. Other transactions must not see a half-finished transfer.
+A **transaction** is a group of reads and writes that must be treated as one logical action. For example, transferring money between two accounts must either update both balances or leave both unchanged. Other transactions must not see a half-finished transfer.
 
-TiDB turns a SQL transaction into reads and writes against TiKV. Those keys may belong to different Regions. TiKV must give the transaction a stable view for its reads, then make all of its writes commit or roll back together.
+Transactions may run at the same time. When they do, the database needs a rule for what each transaction is allowed to see. This rule is called the **isolation level**.
+
+TiDB's `REPEATABLE READ` behavior is based on **snapshot isolation**. Under snapshot isolation, a transaction reads from one consistent snapshot of committed data. Changes committed by other transactions later do not change what it sees.
 
 ## A Stable Read View
 
-Data can change while a transaction is running. A transaction therefore needs a fixed point in history from which to read. TiDB's `REPEATABLE READ` behavior uses **snapshot isolation**: a transaction reads the versions that were committed when it began, even if other transactions commit later.
+When a transaction begins, TiDB gets a timestamp from PD called `start_ts`. This identifies the snapshot the transaction reads from.
 
-When a transaction begins, TiDB gets a timestamp from PD called `start_ts`. Ordinary reads use this timestamp to select visible versions.
+When the transaction commits, TiDB gets another timestamp called `commit_ts`. This determines when its writes become visible to other transactions.
 
 ```text
-Transaction A                         Another transaction
-
+Transaction A                         Transaction B
 begin
 start_ts = 10
-                                      commits changes at timestamp 18
-read the snapshot at 10
-                                      
+                                      begin
+                                      start_ts = 12
+
+read snapshot at 10
+                                      update the key
+                                      commit
+                                      commit_ts = 18
+
+read snapshot at 10
+
 commit
 commit_ts = 24
 ```
 
-Transaction A continues to read the state at timestamp 10. When it commits, TiDB obtains `commit_ts`. Its writes become visible to transactions reading at timestamp 24 or later.
+Although Transaction B commits at timestamp 18, Transaction A continues reading the snapshot at timestamp 10. When Transaction A eventually commits, its own writes become visible at timestamp 24.
 
-The two timestamps have different jobs:
-
-- `start_ts` identifies the transaction's read snapshot.
-- `commit_ts` determines when its writes become visible.
-
-These are TiKV's logical MVCC timestamps. They are separate from the internal sequence numbers used by [RocksDB](../tikv-403/index.md) for its local versioning.
+This choice creates a requirement for TiKV: it must still be able to return the version visible at `start_ts`, even when newer versions have already been committed.
 
 ## Keeping Key History
 
-**MVCC**, or Multi-Version Concurrency Control, keeps enough committed history to reconstruct an older snapshot. A new write does not immediately erase the previous committed version.
+TiKV does this with **MVCC**, or Multi-Version Concurrency Control.
+
+The basic idea is simple: instead of keeping only the latest value of a key, TiKV keeps multiple committed versions.
 
 ```text
 balance
@@ -42,7 +47,7 @@ balance
   commit_ts 21 -> Delete
 ```
 
-The value visible to a read depends on its timestamp:
+To read at a particular timestamp, TiKV chooses the newest version whose `commit_ts` is not greater than the read timestamp.
 
 ```text
 read_ts 12 -> 100
@@ -52,67 +57,16 @@ read_ts 25 -> key not found
 
 A delete adds a `Delete` record. It does not immediately remove the older history, because an older snapshot may still need it.
 
-## Three Column Families
-
-TiKV keeps transaction data in three RocksDB column families. A column family is a separate key-value space inside the same RocksDB database.
-
-```text
-write CF
-  (key, commit_ts) -> { kind, start_ts, short_value? }
-
-default CF
-  (key, start_ts)  -> value
-
-lock CF
-  key              -> { start_ts, primary, ttl, short_value? }
-```
-
-The `write` CF contains committed history. Each record describes a `Put`, `Delete`, or another transaction event, and points back to the transaction's `start_ts`.
-
-The `default` CF stores values that are too large to place directly in a write record. These values use `start_ts` because TiKV stores them during prewrite, before a `commit_ts` exists.
-
-The `lock` CF contains writes that have started but have not yet committed or rolled back.
-
-## Reading at a Timestamp
-
-TiKV encodes timestamps in descending order. For one user key, newer versions therefore appear before older versions. To read at `read_ts`, TiKV finds the newest committed version whose `commit_ts` is no greater than `read_ts`.
-
-Conceptually, a read works like this:
-
-```rust
-fn get(key, read_ts) -> Option<Value> {
-    check_lock(key, read_ts);
-
-    let write = seek_visible_write(key, read_ts)?;
-
-    match write.kind {
-        Put => write.short_value
-            .or_else(|| default_cf.get((key, write.start_ts))),
-        Delete => None,
-    }
-}
-```
-
-Before reading the committed history, TiKV checks the `lock` CF. A conflicting lock means another transaction has prepared a write to this key but has not finished. TiKV cannot simply ignore it.
-
-## Latches and Locks
-
-TiKV uses both latches and locks, but they solve different problems:
-
-```text
-latch  -> in memory, held while one command is processed
-lock   -> persisted in lock CF until the transaction finishes
-```
-
-A latch briefly serializes commands operating on the same key inside TiKV. It is released when the command finishes.
-
-A transaction lock remains after the request returns. It connects separate requests in the transaction protocol, such as prewrite and commit.
-
 ## Committing Across Regions
 
-A transaction may modify keys in several Regions. No single Raft group owns all of them, so TiDB uses **two-phase commit**, or 2PC, to make the transaction reach one outcome.
+MVCC gives a transaction a stable read view. A separate problem remains: how can one transaction update several keys as one logical action?
 
-TiDB coordinates the operation and chooses one written key as the transaction's **primary**. The remaining keys are **secondaries**. This primary is part of the transaction protocol; it is not necessarily a table's SQL primary key.
+Those keys may belong to different Regions. Each Region has its own Raft group, so no single Raft command can commit all of the writes together.
+
+TiKV's basic transaction protocol follows the **Percolator model**.
+TiDB coordinates the operation and chooses one written key as the transaction's **primary**. The primary records the transaction's final outcome; the remaining keys are **secondaries**. This is a transaction-protocol role, not necessarily a table's SQL primary key.
+
+> Percolator model: Prewrite all keys, choose one key as the primary, then commit the primary before the secondary keys.
 
 ```text
 TiDB
@@ -132,17 +86,13 @@ TiDB
 
 TiDB groups the mutations by Region and sends prewrite requests to the relevant TiKV peers.
 
-For each key, TiKV checks for conflicts. If the prewrite succeeds, TiKV stores:
+For each key, TiKV checks whether the write can proceed, stores the new value, and places a **transaction lock** on the key.
 
-```text
-lock CF
-  key -> { start_ts, primary, ttl, ... }
+The lock means that this key has a pending write from the transaction identified by `start_ts`. The transaction's primary key records its final outcome.
 
-default CF
-  (key, start_ts) -> value
-```
+There is no committed write record yet, so readers do not treat the new value as committed.
 
-A short value may be stored directly in the lock instead of the `default` CF. There is no committed write record yet, so readers do not treat the new value as committed.
+The transaction can proceed only after all of its prewrites succeed. Otherwise, it rolls back.
 
 If any prewrite fails, TiDB rolls back the keys that were already prewritten. A rollback removes the pending lock and value, and records that the transaction's `start_ts` was rolled back.
 
@@ -150,35 +100,89 @@ If any prewrite fails, TiDB rolls back the keys that were already prewritten. A 
 
 If every prewrite succeeds, TiDB obtains `commit_ts` from PD and commits the primary key first.
 
-For that key, TiKV performs this conceptual update:
+Committing a key does two things:
 
 ```text
-delete lock CF[key]
-
-put write CF[(key, commit_ts)] =
-    { kind, start_ts, short_value? }
+remove its transaction lock
+add a committed version at commit_ts
 ```
 
-The write record makes the version visible to transactions reading at or after `commit_ts`.
+Once the primary key has committed, the transaction's outcome is committed. TiDB then commits the secondary keys using the same commit_ts.
 
-Once the primary commit succeeds, the transaction has a committed outcome. TiDB can return success and commit the secondary keys afterward. Committing each secondary adds its write record and removes its lock.
+## Persisting the Transaction State
 
-## Resolving an Unfinished Transaction
+`Prewrite` and `commit` are separate requests. After prewrite finishes, TiKV must remember that the value exists but has not yet committed.
 
-TiDB may disappear after prewrite and leave locks behind. Each lock records the transaction's primary key and a time-to-live value, or `ttl`.
+This state cannot live only in memory. TiKV persists it in RocksDB:
 
-A later request that encounters such a lock checks the primary:
+### Three Column Families
 
-```rust
-let status = CheckTxnStatus(primary, start_ts);
+TiKV stores transaction data in three RocksDB column families:
 
-match status {
-    Committed(commit_ts) => ResolveLock(start_ts, commit_ts),
-    RolledBack           => ResolveLock(start_ts, rollback),
-    Uncommitted          => wait_or_retry(),
-}
+```text
+default CF
+  (key, start_ts) -> value
+
+lock CF
+  key -> { start_ts, primary }
+
+write CF
+  (key, commit_ts) -> { kind, start_ts }
 ```
 
-If the primary committed, the secondary locks can also be committed. If the primary rolled back, the secondaries are rolled back. If the primary is still locked but its TTL has expired, `CheckTxnStatus` can roll it back before resolving the secondary locks.
+The `default` CF stores the value written by the transaction.
 
-This lets the transaction reach a final state even when the original TiDB coordinator is gone.
+It uses `start_ts` because TiKV stores the value during prewrite, before the transaction has a `commit_ts`.
+
+The `lock` CF stores pending writes. Its record identifies the transaction and points to its primary key.
+
+The `write` CF stores committed history. A write record says whether the version is a `Put` or `Delete`, when it committed, and which `start_ts` identifies its value in the `default` CF.
+
+The two phases now map directly to the column families:
+
+```text
+Prewrite
+
+default CF <- store value
+lock CF    <- store transaction lock
+
+
+Commit
+
+lock CF    <- remove transaction lock
+write CF   <- add committed version
+```
+
+## Reading at a Timestamp
+
+For each key, versions in the `write` CF are ordered from newer to older.
+
+To read a key at `read_ts`, TiKV finds the newest committed version whose `commit_ts` is no greater than `read_ts`.
+
+For example:
+
+```text
+write CF
+
+(balance, commit_ts 21) -> { Delete }
+(balance, commit_ts 15) -> { Put, start_ts 9 }
+(balance, commit_ts 8)  -> { Put, start_ts 3 }
+```
+
+A read at timestamp 18 skips the version committed at 21 and selects the version committed at 15.
+
+That write record points to `start_ts = 9`, which TiKV uses to find the value:
+
+```text
+default CF
+
+(balance, start_ts 9) -> 80
+```
+
+The read therefore returns 80.
+
+If the selected write record is a Delete, the key does not exist in that snapshot.
+
+Before reading the committed version, TiKV also checks the `lock` CF for a pending transaction that affects the read.
+
+[TiKV 606: Transaction Execution](../tikv-606/index.md) covers transaction command execution, latches, and lock resolution in more detail.

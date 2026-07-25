@@ -89,6 +89,26 @@ A lock remains until the transaction commits or rolls back. If a TiKV store is s
 
 Other reads and writes that encounter those locks need to inspect the transaction's primary key and help resolve its final status. This is why a slow participant often increases `ResolveLock` activity elsewhere in the cluster.
 
+## Resolving Unfinished Transactions
+
+TiDB may disappear after prewrite and leave locks behind. Each lock records the transaction's primary key and a time-to-live value, or `ttl`.
+
+A later request that encounters such a lock checks the primary:
+
+```rust
+let status = CheckTxnStatus(primary, start_ts);
+
+match status {
+    Committed(commit_ts) => ResolveLock(start_ts, commit_ts),
+    RolledBack           => ResolveLock(start_ts, rollback),
+    Uncommitted          => wait_or_retry(),
+}
+```
+
+If the primary committed, the secondary locks can also be committed. If the primary rolled back, the secondaries are rolled back. If the primary is still locked but its TTL has expired, `CheckTxnStatus` can roll it back before resolving the secondary locks.
+
+This lets the transaction reach a final state even when the original TiDB coordinator is gone.
+
 ## The Scheduler Pipeline
 
 The scheduler turns a transaction request into the reads and writes above. At a high level, it:
