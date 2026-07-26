@@ -1,107 +1,142 @@
 # TiKV 502: Linearizable Reads
 
-Raftstore writes data through Raft before applying it to RocksDB. A read is more subtle: a local RocksDB snapshot is not automatically safe to return.
+In [TiKV 501](../tikv-501/index.md), we followed an `async_write` from proposal to callback. The callback notifies the client that the write has completed. By the time it runs, the write has already been applied to RocksDB.
 
-The read must include every `async_write` that completed before the read began. This is the meaning of a **linearizable read**.
+For reads, Raftstore provides the `async_snapshot` API, which returns a RocksDB snapshot. The caller uses the returned snapshot to read RocksDB and serve point reads, batch reads, and scans.
 
-## What a Snapshot Must Include
+Raftstore's `async_snapshot` must provide **linearizable reads**. A linearizable read must observe every write that completed before it began.
 
-When an `async_write` completes, its Raft entry has been committed and applied to the Region's RocksDB state. The Region records this progress in `apply_index`, the index of the latest Raft entry applied to RocksDB.
+## What a Linearizable Read Must See
 
-`async_snapshot` must return a RocksDB snapshot taken after all earlier completed writes have reached that applied state.
-
-Raftstore represents this boundary with a `read_index`: a Raft log index that the snapshot must include. A snapshot is safe only after `apply_index >= read_index`.
+This rule preserves real-time ordering:
 
 ```text
-async_write completes
-        |
-        v
-apply_index advances
-        |
-        v
-async_snapshot begins
-        |
-        v
-snapshot must include that applied write
+async_write
+    request --- replicate --- apply --- complete
+                                           |
+                                           | must be visible
+                                           v
+async_snapshot                             request --- snapshot
 ```
 
-This is why a snapshot cannot be created from an arbitrary replica at an arbitrary time. A follower may still be applying old entries, and a former leader may no longer be the leader.
+If a client successfully writes `k = v` and then reads `k`, the read cannot return the old value. Without this property, the system would be hard to reason about: a client could not even read back a write that had already succeeded.
 
-## The Simple but Slow Approach
+When a write and read overlap, they are concurrent: neither operation completed before the other began. The read may return either the old or new value, because either order is valid.
 
-The most direct way to create a safe read point is to propose an empty Raft entry and wait until it is applied.
+Recall from [TiKV 403](../tikv-403/index.md) that taking a RocksDB snapshot records the latest internal sequence number at that moment. To satisfy the rule above, Raftstore must take the snapshot after all earlier completed writes have been applied.
 
-Raft orders the empty entry after all preceding writes. Once it reaches RocksDB, every earlier committed entry must also have reached RocksDB. Raftstore can then take a snapshot.
+## The Slow Baseline
+
+One naive approach is to propose an empty Raft entry for every read and take the RocksDB snapshot when that entry is applied. This guarantees linearizability: Raft orders the entry after all preceding writes, and applies entries in order.
 
 ```text
-propose empty entry
-        |
-        v
-replicate and commit it
-        |
-        v
-apply it to RocksDB
-        |
-        v
-take snapshot
+propose an empty Raft entry
+            |
+            v
+replicate, commit, and apply it
+            |
+            v
+take a RocksDB snapshot
 ```
 
-This works, but it is too expensive for normal reads. Every read would add a log entry, persist it, replicate it, and apply it, even though the read does not change data.
+This is correct but too expensive. A read would pay nearly the full cost of a write without changing data.
 
-## Why the Leader Must Be Current
+## The Leader Intuition
 
-Only the current leader can establish a linearizable read point for a Region. A node that used to be leader may be disconnected from the majority while another leader has been elected elsewhere. Reading from that old leader could miss a write that has already completed on the new leader.
+Set aside the brief period immediately after an election and consider the normal case.
 
-Raft divides time into **terms**. Each election chooses a leader for one term, and a newer term always has a larger number. But being elected in a term is not enough: the leader must also know that it still has contact with a majority of replicas.
+Every completed `async_write` has already been applied to the leader's RocksDB. The leader may have newer entries that are committed but not yet applied, but those writes have not completed. Its RocksDB therefore contains every write that a new linearizable read is required to observe.
 
-## Leader Lease
+The read does not need another Raft entry or additional apply work. It only needs to establish that this peer is still the leader.
 
-A leader sends periodic heartbeats to followers. A follower starts an election only after it has not heard from a leader for an **election timeout**.
+This is the idea behind a lease read.
 
-Raftstore uses a **leader lease** that is slightly shorter than that election timeout. When the leader receives recent heartbeat acknowledgements from a quorum, it renews the lease. While that lease is valid, the leader knows that the quorum which acknowledged it has not timed out and started another election.
+## Lease Read
 
-With a valid lease, the leader can serve a read without writing a new Raft entry. It uses its current committed position as the read point, waits until RocksDB has applied through that point, then returns a snapshot.
+In the normal case, the leader's RocksDB already contains every completed write. The only remaining question is whether this peer is still the leader.
+
+Raftstore answers this question with a **leader lease**, an extension to the basic Raft protocol. The leader sends heartbeats to the followers. When a quorum acknowledges the leader's recent Raft messages, the leader establishes or renews its lease.
+
+The lease period is shorter than the election timeout. While the lease remains valid, another peer cannot win an election and become the leader. The local peer can therefore trust that its leadership is still current.
+
+For a typical leader, this is enough:
 
 ```text
-valid leader lease
-        |
-        v
-wait until apply_index reaches the read point
-        |
-        v
-take RocksDB snapshot
+leader lease is valid
+          |
+          v
+take a local RocksDB snapshot
+          |
+          v
+serve the read
 ```
 
-The lease is a fast path. It avoids an extra network round trip for reads while the leader is actively communicating with its followers.
+This is called a lease read, or local read. It is the fast path: no new Raft entry, no apply work, and no network round trip for the read itself.
 
-## ReadIndex When the Lease Is Not Valid
+The fast path is not immediately available in two cases.
 
-A lease may not be valid when a leader has just been elected, after a long pause, or when it has not recently heard from a quorum. In those cases, Raftstore uses **ReadIndex**.
-
-ReadIndex asks the leader to confirm its leadership explicitly:
-
-1. The leader sends heartbeats to the followers.
-2. A quorum of followers acknowledges the heartbeats.
-3. The leader now knows it is still the leader for the current term and uses its current committed position as `read_index`.
-4. The leader waits until `apply_index` has reached `read_index`.
-5. Raftstore takes a RocksDB snapshot.
+First, the leader may have just won an election. Its Raft log contains the committed history, but its RocksDB state may still be catching up. Before serving a local read, it must apply an entry from its current term.
 
 ```text
-leader
-  |
-  | heartbeat with ReadIndex request
-  v
-followers
-  |
-  | acknowledgements from a quorum
-  v
-leader confirms leadership
-  |
-  | wait until apply_index >= read_index
-  v
-take RocksDB snapshot
+new leader
+    |
+    v
+apply an entry from the current term
+    |
+    v
+all earlier committed entries have reached RocksDB
 ```
 
-ReadIndex does not add a new Raft log entry or persist a new log record. It only needs a quorum heartbeat round trip and a wait for local application to catch up.
+Raft applies entries in order. Once an entry from the current term has been applied, every earlier committed entry, including entries from previous terms, has also been applied.
 
-`async_snapshot` therefore has two ways to establish a linearizable read point: use a valid leader lease, or confirm leadership through ReadIndex. In both cases, it returns a RocksDB snapshot only after the required Raft entries have been applied.
+Second, the leader's lease may be expired or uncertain. In that case, the peer cannot determine from local state alone whether it is still the leader. It uses **ReadIndex** instead.
+
+## ReadIndex
+
+ReadIndex confirms leadership through a quorum without adding a new entry to the Raft log.
+
+The leader sends heartbeats for the pending read and waits for acknowledgements from a quorum:
+
+```text
+lease is uncertain
+        |
+        v
+send ReadIndex heartbeats
+        |
+        v
+quorum confirms leadership
+        |
+        v
+take a RocksDB snapshot
+```
+
+Once the quorum responds, the peer knows that it is still the leader. As long as its local RocksDB state is ready, Raftstore can take the snapshot and serve the read.
+
+If the peer discovers a newer term, it is no longer the leader and rejects the request. If it cannot contact a quorum, it cannot safely complete the read.
+
+ReadIndex is slower than a lease read because it requires a network round trip, but it is still much cheaper than proposing an empty Raft entry. It confirms leadership without writing, persisting, or applying a new log entry.
+
+## The Complete Flow
+
+```text
+async_snapshot
+      |
+      v
+is the local peer the leader?
+      |
+      +-- no --> reject
+      |
+      v
+has it applied into its current term?
+      |
+      +-- no --> wait or use ReadIndex
+      |
+      v
+is the leader lease valid?
+      |
+      +-- yes --> take a RocksDB snapshot
+      |
+      +-- no --> ReadIndex confirms a quorum --> take a snapshot
+```
+
+The returned snapshot includes every write that completed before the read began. That is a **linearizable snapshot**.

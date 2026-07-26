@@ -238,4 +238,4 @@ The transaction layer therefore sees one asynchronous write operation, while Raf
 
 Raftstore first establishes the required Raft read position and waits until the local KV Engine reflects that position. It then returns a snapshot that the transaction layer can use for point reads and scans.
 
-[TiKV 502: Linearizable Reads](../tikv-502/index.md) examines this path in detail.
+We will examine this path in more detail in [TiKV 502: Linearizable Reads](../tikv-502/index.md).
