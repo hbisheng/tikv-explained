@@ -1,4 +1,4 @@
-# TiKV 605: Coprocessor Operators
+# TiKV 605: Coprocessor Operators and Patterns
 
 SQL talks about tables, rows, indexes, and joins. TiKV stores ordered key-value pairs. The coprocessor is where a query's table and index scans become operations over those keys.
 

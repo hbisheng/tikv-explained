@@ -1,47 +1,63 @@
 # TiKV 503: Coprocessor Introduction
 
-TiKV can perform some query work on behalf of TiDB. This is called **pushdown computation** or the **coprocessor** path.
+In [TiKV 502](../tikv-502/index.md), Raftstore returned a snapshot that gives a reader a consistent view of one Region's data. TiKV can use the snapshot to read a single key or scan a key range.
 
-For example, consider a query that needs a count of rows matching a condition. TiDB could fetch every matching row from TiKV and count them itself. Instead, it can ask TiKV to scan the data, apply the condition, compute the count locally, and return only the result.
+This chapter follows the range-scan path used for SQL queries. TiDB can push part of a query plan to TiKV, where the coprocessor, or cop, scans the relevant keys and performs the requested computation.
 
-```text
-without pushdown: TiKV -> matching rows -> TiDB -> count
-with pushdown:    TiKV -> count -> TiDB
+## Push Computation to Storage
+
+A table may span many Regions distributed across different TiKV stores. Consider this query:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE status = 'paid';
 ```
 
-This makes coprocessor work a read-heavy path: it reads data from TiKV, performs computation over those reads, and returns query results to TiDB.
-
-## One Task per Data Range
-
-TiDB divides a coprocessor request into tasks, usually one task for each Region or Region bucket that contains relevant data. The tasks can run in parallel because each one reads a different key range.
-
-Each coprocessor request goes directly into TiKV's read pools.
-
-Before reading data, TiKV obtains a **snapshot**. Every read in that task uses the same snapshot, so the scan and computation observe one consistent view of the data.
+Without pushdown, TiDB would fetch the scanned rows from those Regions, then filter and count them itself.
 
 ```text
-TiDB
-  |
-  +--> cop task for Region A -> snapshot -> scan and compute
-  +--> cop task for Region B -> snapshot -> scan and compute
-  +--> cop task for Region C -> snapshot -> scan and compute
-  |
-  v
-combine results
+TiKV scans rows -> scanned rows -> TiDB filters and counts
 ```
 
-## Executors Form a Pipeline
+The answer is one number, but all the scanned rows cross the network.
 
-TiDB describes the work as a directed acyclic graph, or **DAG**, of executors. A common pipeline looks like this:
+With pushdown, TiDB sends the filter and count operation with the scan request. Each TiKV task scans its portion of the table, keeps the paid rows, and returns a partial count. TiDB then adds the counts together.
 
 ```text
-scan -> filter -> aggregate -> TopN -> limit
+TiKV scans, filters, and counts -> partial counts -> TiDB combines
 ```
 
-The outer executor pulls results from the executor below it. That pull travels down the chain until the scan executor performs the actual key-value reads from RocksDB. Rows then flow back up through filtering, aggregation, sorting, and limiting.
+The input data remains close to storage, and only the much smaller partial results cross the network.
 
-This is the high-level coprocessor model: TiDB creates range tasks, TiKV reads one snapshot per task, executors process the data close to storage, and TiDB combines the task results.
+Cop supports more than this particular combination. Filters select rows, aggregations such as `COUNT` and `SUM` reduce many rows to a value, and `TopN` keeps the first N rows under an ordering. TiDB can combine such operators and push the resulting work to TiKV.
 
-Query time in TiDB is the wall time for the whole query. It can include multiple coprocessor tasks running in parallel, so it is not the duration of one individual TiKV task.
+## Cop Tasks
 
-The table and index scans behind these tasks are introduced in [TiKV 605: Coprocessor Operators](../tikv-605/index.md).
+TiKV stores table rows and index entries as ordered keys. A table or index scan therefore becomes a scan over a continuous interval of keys.
+
+That interval may span multiple Regions. TiDB splits it at Region boundaries and sends a cop task to each relevant Region. These tasks can run in parallel across TiKV stores.
+
+```text
+TiDB cop request
+        |
+        v
+Raftstore obtains a snapshot
+        |
+        v
+scan the Region's key interval
+        |
+        v
+run the pushed-down operators
+        |
+        v
+return a partial result
+```
+
+Each task processes only its Region's portion of the data. For the `COUNT` example, each task returns a partial count, and TiDB adds them together.
+
+## The Read Pool
+
+TiKV runs cop tasks on read-pool workers. A task occupies a worker while it scans data and executes operators.
+
+Its cost depends on the data scanned and the computation performed, not only on the result size. Broad scans or expensive operators can therefore keep workers busy even when they return little data. When all workers are busy, later tasks wait and latency rises.
+
+[TiKV 605](../tikv-605/index.md) will examine coprocessor operators, scan patterns, and their execution details in more depth.

@@ -1,4 +1,4 @@
-# TiKV 606: Transaction Execution
+# TiKV 606: Transaction Scheduler
 
 [TiKV 404](../tikv-404/index.md) described the data that a transaction leaves in the `write`, `default`, and `lock` column families. This chapter follows one transaction command: how TiKV checks whether it is allowed to write, then turns it into those column-family changes.
 

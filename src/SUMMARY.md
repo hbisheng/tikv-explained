@@ -31,8 +31,8 @@
 # Level 6: Core Mechanisms
 
 - [TiKV 604: RocksDB Details](tikv-604/index.md)
-- [TiKV 605: Coprocessor Operators](tikv-605/index.md)
-- [TiKV 606: Transaction Execution](tikv-606/index.md)
+- [TiKV 605: Coprocessor Operators and Patterns](tikv-605/index.md)
+- [TiKV 606: Transaction Scheduler](tikv-606/index.md)
 
 # Level 7: Detailed
 

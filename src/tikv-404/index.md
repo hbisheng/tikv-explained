@@ -185,4 +185,4 @@ If the selected write record is a Delete, the key does not exist in that snapsho
 
 Before reading the committed version, TiKV also checks the `lock` CF for a pending transaction that affects the read.
 
-[TiKV 606: Transaction Execution](../tikv-606/index.md) covers transaction command execution, latches, and lock resolution in more detail.
+[TiKV 606: Transaction Scheduler](../tikv-606/index.md) covers transaction command execution, latches, and lock resolution in more detail.
