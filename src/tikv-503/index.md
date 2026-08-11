@@ -1,4 +1,4 @@
-# TiKV 503: Coprocessor Introduction
+# TiKV 503: Coprocessor Intro
 
 In [TiKV 502](../tikv-502/index.md), Raftstore returned a snapshot that gives a reader a consistent view of one Region's data. TiKV can use the snapshot to read a single key or scan a key range.
 

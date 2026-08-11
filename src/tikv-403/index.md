@@ -1,4 +1,4 @@
-# TiKV 403: A Quick RocksDB Intro
+# TiKV 403: RocksDB Intro
 
 RocksDB is an open-source, embedded key-value storage library. TiKV uses it as a local, single-node KV store.
 
