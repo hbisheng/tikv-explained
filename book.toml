@@ -14,6 +14,7 @@ git-repository-url = "https://github.com/hbisheng/tikv-explained"
 edit-url-template = "https://github.com/hbisheng/tikv-explained/edit/main/{path}"
 site-url = "/tikv-explained/"
 additional-css = ["theme/custom.css"]
+additional-js = ["theme/chapter-title.js"]
 no-section-label = true
 
 [output.html.fold]
@@ -22,3 +23,33 @@ level = 1
 
 [output.html.print]
 enable = true
+
+[output.html.redirect]
+"/tikv-101/index.html" = "../101.html"
+"/tikv-201/index.html" = "../201.html"
+"/tikv-301/index.html" = "../301.html"
+"/tikv-401/index.html" = "../401.html"
+"/tikv-402/index.html" = "../402.html"
+"/tikv-403/index.html" = "../403.html"
+"/tikv-404/index.html" = "../404/index.html"
+"/tikv-501/index.html" = "../501.html"
+"/tikv-502/index.html" = "../502.html"
+"/tikv-503/index.html" = "../503.html"
+"/tikv-601/index.html" = "../601.html"
+"/tikv-602/index.html" = "../602.html"
+"/tikv-603/index.html" = "../603.html"
+"/tikv-604/index.html" = "../604.html"
+"/tikv-605/index.html" = "../605.html"
+"/tikv-606/index.html" = "../606.html"
+"/tikv-607/index.html" = "../607.html"
+"/tikv-701/index.html" = "../701.html"
+"/tikv-702/index.html" = "../702.html"
+"/tikv-703/index.html" = "../703.html"
+"/tikv-704/index.html" = "../704.html"
+"/tikv-705/index.html" = "../705.html"
+"/tikv-706/index.html" = "../706.html"
+"/tikv-801/index.html" = "../801.html"
+"/tikv-802/index.html" = "../802.html"
+"/tikv-803/index.html" = "../803.html"
+"/tikv-804/index.html" = "../804.html"
+"/tikv-901/index.html" = "../901.html"

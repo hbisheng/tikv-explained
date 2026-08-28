@@ -47,6 +47,28 @@
     margin: 0;
 }
 
+.level-map-group {
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.level-map-group:last-child {
+    margin-bottom: 0;
+}
+
+.level-map-category {
+    display: block;
+    color: var(--fg);
+    font-size: 0.8em;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.level-map-links {
+    display: block;
+    padding-left: 0.75rem;
+}
+
 @media (max-width: 900px) {
     .content main:has(.level-map-image) {
         width: auto;

@@ -5,50 +5,55 @@
 
 # Level 1: Orientation
 
-- [TiKV 101: What Is TiKV?](tikv-101/index.md)
+- [101 What Is TiKV?](101.md)
 
 # Level 2: Ecosystem
 
-- [TiKV 201: The TiDB Ecosystem](tikv-201/index.md)
+- [201 TiDB Ecosystem](201.md)
 
 # Level 3: Architecture
 
-- [TiKV 301: TiKV Architecture](tikv-301/index.md)
+- [301 Architecture](301.md)
 
 # Level 4: Fundamentals
 
-- [TiKV 401: Raft Crash Course](tikv-401/index.md)
-- [TiKV 402: The Raft Event Loop](tikv-402/index.md)
-- [TiKV 403: RocksDB Intro](tikv-403/index.md)
-- [TiKV 404: Transaction Intro](tikv-404/index.md)
+- [401 Raft Crash Course](401.md)
+- [402 Raft Event Loop](402.md)
+- [403 RocksDB Intro](403.md)
+- [404 Transaction Intro](404/index.md)
 
 # Level 5: Data Flow
 
-- [TiKV 501: Raftstore Write Flow](tikv-501/index.md)
-- [TiKV 502: Linearizable Reads](tikv-502/index.md)
-- [TiKV 503: Coprocessor Intro](tikv-503/index.md)
+- [501 Write Flow](501.md)
+- [502 Linearizable Reads](502.md)
+- [503 Coprocessor Intro](503.md)
 
 # Level 6: Core Mechanisms
 
-- [TiKV 601: Leader Transfer](tikv-601/index.md)
-- [TiKV 602: Conf Change](tikv-602/index.md)
-- [TiKV 603: Region Split](tikv-603/index.md)
-- [TiKV 604: RocksDB Details](tikv-604/index.md)
-- [TiKV 605: Coprocessor Operators](tikv-605/index.md)
-- [TiKV 606: Transaction Scheduler](tikv-606/index.md)
+- [601 Leader Transfer](601.md)
+- [602 Replica Movement](602.md)
+- [603 Raft Snapshot](603.md)
+- [604 Region Split](604.md)
+- [605 RocksDB Details](605.md)
+- [606 Coprocessor Operators](606.md)
+- [607 Transaction Scheduler](607.md)
 
 # Level 7: Detailed
 
-- [TiKV 702: Slow Score](tikv-702/index.md)
-- [TiKV 705: YATP Internals](tikv-705/index.md)
-- [TiKV 707: Snapshot](tikv-707/index.md)
+- [701 Batch System](701.md)
+- [702 Slow Score](702.md)
+- [703 Region Worker](703.md)
+- [704 Titan](704.md)
+- [705 YATP Internals](705.md)
+- [706 Async Commit and 1PC](706.md)
 
 # Level 8: Advanced
 
-- [TiKV 801: Region Merge](tikv-801/index.md)
-- [TiKV 803: In-Memory Pessimistic Locks](tikv-803/index.md)
-- [TiKV 804: Raft Hibernation](tikv-804/index.md)
+- [801 Region Merge](801.md)
+- [802 Raft Hibernation](802.md)
+- [803 In-Memory Pessimistic Locks](803.md)
+- [804 GC and Compaction Filter](804.md)
 
 # Level 9: Peak
 
-- [TiKV 901: Raft Peer Lifecycle](tikv-901/index.md)
+- [901 Peer Lifecycle](901.md)
