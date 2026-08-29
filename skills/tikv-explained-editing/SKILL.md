@@ -25,6 +25,9 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Do not introduce unfamiliar terms before they are needed; define important terms near first use.
 - A new chapter may rely only on concepts established by earlier chapters, unless it defines the concept where it first appears. Audit every nontrivial term, acronym, and code-level name before publishing: it must be established earlier, defined locally, or removed/deferred. Do not use code-level names as unexplained shorthand.
 - Keep the flow natural. Use short sections when a concept needs its own mental boundary.
+- Make every section add a distinct step, decision, or boundary beyond earlier chapters. Do not repeat an earlier overview flow unless the new version explains a concrete missing part.
+- In a multi-component flow, name which component performs each action. Distinguish a logical operation or plan from the physical access path that implements it.
+- Leave configurable defaults, version history, and tuning values out of introductory explanations unless they change the mental model being built.
 - Avoid unnecessary summaries, meta narration, and obvious setup sentences.
 - Defer protocol roles and mechanism details until the level that needs them.
 - Avoid turning TiKV-specific design into general database claims.

@@ -117,10 +117,10 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 
 ## TXN 607: Transaction Scheduler
 
-- **Depends on:** transaction protocol, MVCC records, locks, and prewrite from 404; `async_write`/`async_snapshot` from 501-502; read-pool distinction from 503 and 706.
-- **Introduces:** transaction scheduler, latch, hash slot, write conflict, pessimistic lock, resolve lock, primary status check, scheduler stages and metrics.
-- **Core flow:** command -> snapshot and MVCC/lock reads -> latch acquisition -> conflict checks -> prepare CF changes -> `async_write` -> completion.
-- **Deferred:** exact concurrency-manager behavior and production diagnosis details.
+- **Depends on:** transaction protocol, MVCC records, locks, prewrite, and primary keys from 404; `async_write`/`async_snapshot` from 501-502; standalone read-pool requests from 503.
+- **Introduces:** Region-scoped transaction command, transaction scheduler, latch, hash slot, write conflict, optimistic and pessimistic transactions, lock resolution, and primary status check.
+- **Core flow:** Region command -> latch acquisition -> snapshot and MVCC/lock reads -> conflict checks -> prepare CF changes -> `async_write` -> release latch and completion.
+- **Deferred:** exact concurrency-manager behavior, in-memory pessimistic locks, and scheduler performance metrics.
 
 ## RAFTSTORE 701: Batch System
 

@@ -4,6 +4,18 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-29 19:36 CST - Keep TXN 607 on Its Core Flow
+
+In TXN 607, the primary-key commit needs the acting subject: TiDB sends that commit. The scheduler-metrics section is not necessary at this level and interrupts the transaction-command story.
+
+Changed the sentence to state that TiDB commits the primary key. Removed the scheduler-metrics section and marked those metrics as deferred in the chapter concept map.
+
+## 2026-08-29 16:35 CST - Proactive Transaction Scheduler Review
+
+After COP 606, the next review target is TXN 607. Today's feedback establishes a few checks that the draft needed: start from one concrete operation, make each section add information beyond earlier chapters, identify which component owns each operation, avoid incidental configuration detail, and do not let code-level diagnostic terms appear before their purpose is clear. The scheduler chapter also needs its actual execution order to be correct.
+
+Rebuilt TXN 607 around one Region's prewrite for a two-Region transfer. It now introduces the scheduler before its mechanisms, puts latch acquisition before snapshot and MVCC reads, removes configuration values and duplicated lock-resolution prose, defines `CheckTxnStatus` and `ResolveLock` by their roles, and narrows the metrics section to actionable stage meanings. Added the reusable section-value, ownership-boundary, and introductory-detail rules to the editing skill.
+
 ## 2026-08-29 16:27 CST - Row Handles and Concrete Hash Join
 
 COP 606 should explain a row handle through the actual distinction readers need: a clustered primary key uses the SQL primary key as the handle, while a nonclustered layout uses a hidden row ID. The configurability and default-setting discussion is a distraction here. The Index Join must not treat obtaining `user_id` as optional when the shown `status` index does not contain it. Hash Join needs build and probe as visible concepts, multiple join keys in the example, a reason to prefer a smaller build input, and a concise TiDB/TiKV boundary. It should also make clear that scanning and in-memory matching avoid the per-row inner lookup of Index Join.
