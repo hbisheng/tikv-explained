@@ -12,6 +12,7 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Before drafting or substantially revising a chapter, consult and update `writing/chapter-concept-map.md`. For every chapter, record its dependencies, concepts introduced, core flow, and deferred details.
 - Do not commit generated `book/`.
 - Keep the repo private and do not push unless the user explicitly asks.
+- Use specific commit messages. The subject must state the kind of change and the affected chapter or area; for multi-chapter or structural changes, add a commit body that lists the main chapters/files and the substantive change. Avoid generic messages such as `Develop`, `Update`, or `Refine` without that context.
 
 ## Writing
 

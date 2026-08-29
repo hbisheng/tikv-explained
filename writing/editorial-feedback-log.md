@@ -4,6 +4,12 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-29 13:41 CST - Informative Commit Messages
+
+Commit messages should let a future reader understand the content of the change without opening the diff. They must name the kind of edit and affected chapters or area, rather than using broad messages that only say something was developed or refined.
+
+Added a durable commit-message rule to the editing skill: the subject names the change and chapter/area, while multi-chapter or structural edits include a body listing their main scope.
+
 ## 2026-08-29 12:31 CST - Write Pressure Beyond Memtables
 
 ROCKSDB 704 should not frame flow control as only a memtable issue. The opening needs a broader title and needs to connect immutable memtables, L0 backlog, and compaction backlog as pressure signals across one write path.
