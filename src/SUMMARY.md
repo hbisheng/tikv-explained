@@ -34,8 +34,8 @@
 - [602 Replica Movement](602.md)
 - [603 Raft Snapshot](603.md)
 - [604 Region Split](604.md)
-- [605 RocksDB Details](605.md)
-- [606 Coprocessor Operators](606.md)
+- [605 RocksDB LSM Tree](605.md)
+- [606 Coprocessor Patterns](606.md)
 - [607 Transaction Scheduler](607.md)
 
 # Level 7: Detailed
@@ -43,9 +43,11 @@
 - [701 Batch System](701.md)
 - [702 Slow Score](702.md)
 - [703 Region Worker](703.md)
-- [704 Titan](704.md)
-- [705 YATP Internals](705.md)
-- [706 Async Commit and 1PC](706.md)
+- [704 RocksDB Details](704.md)
+- [705 Titan](705.md)
+- [706 YATP Internals](706.md)
+- [707 Coprocessor Execution](707.md)
+- [708 Async Commit and 1PC](708.md)
 
 # Level 8: Advanced
 

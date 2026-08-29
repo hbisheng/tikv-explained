@@ -90,9 +90,9 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 ## RAFT 603: Raft Snapshot
 
 - **Depends on:** Raft log, commit, and log replication from 401; Raft Engine, KV Engine, apply index, and apply system from 501; RocksDB snapshot from 403; Region metadata and uninitialized peer from 602.
-- **Introduces:** bulk copy and incremental catch-up, log truncation, state at a Raft position, Raft snapshot, snapshot index and term, SST files, `PeerStorage`, temporarily unavailable snapshot generation, snapshot worker pool, separate snapshot transfer, Region workers, SST ingestion, range cleanup.
-- **Core flow:** follower is too far behind for retained logs -> leader creates a snapshot at a Raft position -> transfers metadata and data -> receiver cleans the range and ingests SST files -> normal log replication resumes.
-- **Deferred:** crash-safe state transitions and two-engine recovery in 901.
+- **Introduces:** bulk copy and incremental catch-up, log truncation, state at a Raft position, Raft snapshot, snapshot index and term, SST files, `PeerStorage`, temporarily unavailable snapshot generation, snapshot worker pool, and separate snapshot transfer.
+- **Core flow:** follower is too far behind for retained logs -> leader creates a snapshot at a Raft position -> transfers metadata and data -> receiver passes it to local storage work -> ordinary log replication continues after installation.
+- **Deferred:** receiving-side cleanup and SST ingestion in 703; crash-safe state transitions and two-engine recovery in 901.
 
 ## RAFTSTORE 604: Region Split
 
@@ -101,23 +101,23 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 - **Core flow:** size check or PD request -> find or receive split key -> ask PD for IDs -> leader proposes split -> Raft commits -> every replica persists updated `RegionLocalState` -> new Region peer starts with its own Raft state.
 - **Deferred:** split creation races, snapshots, and durable peer metadata in 901.
 
-## ROCKSDB 605: RocksDB Details
+## ROCKSDB 605: RocksDB LSM Tree
 
 - **Depends on:** RocksDB versions, scans, and column families from 403.
-- **Introduces:** memtable, flush, detailed SST-file structure, LSM level, compaction, base level, dynamic level bytes, compaction candidate, clean cut, compaction guard, prefix seek, bloom filter, write batch, WriteThread, write group, WAL group commit.
-- **Core flow:** writes enter a write group -> WAL and memtable -> flush to SSTs -> compaction selects and rewrites files across levels.
-- **Deferred:** workload-specific tuning and code-level picker implementation.
+- **Introduces:** WAL, memtable, immutable memtable, flush, SST data/index blocks, LSM levels, L0 overlap, non-overlapping deeper levels, compaction, atomic compaction publication, base level, and dynamic level bytes.
+- **Core flow:** WAL append -> active memtable -> immutable memtable at its size threshold -> background flush to L0 SST -> compaction moves and merges pressured levels -> dynamic sizing activates only the needed deeper levels.
+- **Deferred:** write grouping, prefix seek and Bloom filters, compaction candidate expansion, concurrency, output-file guards, and detailed configuration in 704.
 
-## COP 606: Coprocessor Operators
+## COP 606: Coprocessor Patterns
 
-- **Depends on:** cop task, operators, read pool, and Region-scoped scans from 503; RocksDB scans from 403; MVCC column families from 404; cooperative scheduling from 705 for its detailed queueing model.
-- **Introduces:** table key, row ID, index key, unique/non-unique index, executor DAG, pull execution, TableReader, IndexReader, IndexLookup, HashJoin, IndexJoin, yield point, concurrency limiter, resource control, cop timing metrics, iterator statistics.
-- **Core flow:** TiDB encodes table/index access -> executor chain pulls rows from a snapshot -> scan yields by policy -> TiKV reports task and iterator work.
-- **Deferred:** full SQL planning and exact storage encodings.
+- **Depends on:** cop task, Region-scoped scans, and read pool from 503; RocksDB scans from 403; snapshot from 501-502.
+- **Introduces:** simplified TiDB row/index encoding, table ID, index ID, clustered and nonclustered primary-key layout, row handle, unique/non-unique index layout, table range scan, index scan, index lookup, back-to-table read, seek versus `next`, index join, hash join, and operator DAG pull flow.
+- **Core flow:** TiDB encodes rows and indexes into ordered key intervals -> query access selects a row or index interval -> each Region task takes a snapshot, scans or seeks the needed keys, runs its operators -> TiDB combines partial results.
+- **Deferred:** exact byte encoding, code-level executor implementation, task yielding, concurrency/resource limits, cop timing, and iterator statistics in 707.
 
 ## TXN 607: Transaction Scheduler
 
-- **Depends on:** transaction protocol, MVCC records, locks, and prewrite from 404; `async_write`/`async_snapshot` from 501-502; read-pool distinction from 503 and 705.
+- **Depends on:** transaction protocol, MVCC records, locks, and prewrite from 404; `async_write`/`async_snapshot` from 501-502; read-pool distinction from 503 and 706.
 - **Introduces:** transaction scheduler, latch, hash slot, write conflict, pessimistic lock, resolve lock, primary status check, scheduler stages and metrics.
 - **Core flow:** command -> snapshot and MVCC/lock reads -> latch acquisition -> conflict checks -> prepare CF changes -> `async_write` -> completion.
 - **Deferred:** exact concurrency-manager behavior and production diagnosis details.
@@ -138,26 +138,40 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 
 ## RAFTSTORE 703: Region Worker
 
-- **Depends on:** RocksDB snapshots and sequence numbers from 403; Raftstore apply and KV Engine from 501; Raft snapshot semantics, generation, and transfer from 603; Region metadata and `RegionLocalState` from 604.
+- **Depends on:** RocksDB snapshots and sequence numbers from 403; SST files and LSM basics from 605; Raftstore apply and KV Engine from 501; Raft snapshot semantics, generation, and transfer from 603; Region metadata and `RegionLocalState` from 604.
 - **Introduces:** Region worker, snapshot application cleanup, valid overlapping metadata, delayed Region deletion, oldest active snapshot sequence, SST-contained file deletion, key-based deletion, deletion-SST legacy path.
 - **Core flow:** generate snapshot or receive deletion/apply work -> protect active readers and Region ownership -> clean stale range -> delete files or keys, or ingest snapshot SSTs -> finish the local Region transition.
 - **Deferred:** detailed worker scheduling and crash-recovery races in 901.
 
-## ROCKSDB 704: Titan
+## ROCKSDB 704: RocksDB Details
+
+- **Depends on:** WAL, memtables, SST files, levels, and compaction from 605; MVCC version layout in `write` CF from 404; Raftstore apply batches from 501.
+- **Introduces:** memtable pressure, TiKV write flow control, `memtables-threshold`, WriteThread, write group, grouped WAL append, conditional parallel memtable insertion, prefix seek, raw-key prefix, Bloom filter, compaction seed file, clean cut, compaction overlap expansion, background compaction jobs, subcompaction, and compaction guard.
+- **Core flow:** concurrent WriteBatches form an ordered write group -> WAL and memtable insertion -> compaction selects a self-contained overlapping range -> independent jobs or subcompactions perform the rewrite -> output files respect practical size boundaries.
+- **Deferred:** workload-specific tuning and code-level RocksDB picker implementation.
+
+## ROCKSDB 705: Titan
 
 - **Depends on:** RocksDB snapshots and versions from 403; memtables, SST files, LSM levels, flush, and compaction from 605; MVCC versions and retained history from 404.
 - **Introduces:** value separation, `min-blob-size`, blob file, `BlobIndex`, discardable blob record, discardable ratio, blob garbage collection, live and obsolete blob data, blob lookup, and the compaction-I/O tradeoff.
 - **Core flow:** large value -> blob file plus small LSM reference -> compaction rewrites references -> obsolete references make blob records discardable -> ratio-based background GC rewrites live values and references -> old blob file is removed.
 - **Deferred:** Titan's optional level-merge mode, detailed blob cache behavior, exact implementation internals, and production tuning and metrics.
 
-## TiKV 705: YATP Internals
+## COP 706: YATP Internals
 
 - **Depends on:** read pool from 503.
 - **Introduces:** process, thread, task, thread pool, cooperative executor, future, poll, `Pending`, waker, single-level/multi-level/priority queues, unified read pool, task states, read-pool metrics.
 - **Core flow:** submitted task -> queue -> worker polls -> task finishes or returns `Pending` -> waker reschedules it.
 - **Deferred:** exact pool selection in a particular deployment and scheduler-worker implementation.
 
-## TXN 706: Async Commit and 1PC
+## COP 707: Coprocessor Execution
+
+- **Depends on:** cop task, access patterns, seek, scan, and operators from 503 and 606; cooperative task execution and read pools from 706; MVCC/iterator context from 403-404.
+- **Introduces:** cop task timing boundaries, yield point, `ScanExecutor` yield policy, concurrency limiter, resource limiter, request/handle/wait metrics, and TiKV/RocksDB iterator statistics.
+- **Core flow:** cop task waits for a worker -> obtains a snapshot -> runs and may yield -> can wait on concurrency/resource limits -> reports request, execution, wait, and iterator work.
+- **Deferred:** code-level handler construction, resource-control configuration, and workload-specific diagnosis.
+
+## TXN 708: Async Commit and 1PC
 
 - **Depends on:** RocksDB snapshots from 403; 2PC, prewrite, transaction lock, `write` CF, `default` CF, and MVCC visibility from 404.
 - **Introduces:** Async Commit, async-commit metadata, concurrency manager, `max_ts`, in-memory lock table, and one-phase commit (1PC).

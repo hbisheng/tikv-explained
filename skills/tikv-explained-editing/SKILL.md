@@ -15,6 +15,8 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 
 ## Writing
 
+- After handling each user turn that gives editorial feedback, append one concise, reverse-chronological entry to `writing/editorial-feedback-log.md` before committing. Use two plain paragraphs: preserve the user's core intent and tone, with affected chapters embedded; then state the changes made. Do not copy the full conversation or use `Feedback` / `Changes` labels.
+- When adding an entry, decide whether its feedback establishes a durable rule. Add only durable rules to this skill; do not record rules in the feedback log.
 - Follow the 101 style: cut to the chase, direct, succinct.
 - Start from the problem and first principles. Explain why before how, introduce concepts one at a time, and do not assume knowledge not established in earlier chapters.
 - Show only what is necessary for the reader's current level.
