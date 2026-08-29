@@ -29,6 +29,8 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Defer protocol roles and mechanism details until the level that needs them.
 - Avoid turning TiKV-specific design into general database claims.
 - Prefer small diagrams, concrete examples, and Rust-shaped pseudocode over long prose.
+- Keep illustrative schemas and key examples self-contained: do not introduce a field or index value absent from the example, and explicitly label intentionally omitted key or value data.
+- In introductory SQL examples, prefer full descriptive table and column names over aliases. Introduce aliases only when the alias syntax itself matters.
 - Use bold sparingly for core concepts that help scanning.
 - Preserve the author's explanatory intent; avoid generic polished filler.
 - Mental model first, mechanism next, code details last.

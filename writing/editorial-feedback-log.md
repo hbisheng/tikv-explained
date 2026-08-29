@@ -4,6 +4,36 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-29 16:27 CST - Row Handles and Concrete Hash Join
+
+COP 606 should explain a row handle through the actual distinction readers need: a clustered primary key uses the SQL primary key as the handle, while a nonclustered layout uses a hidden row ID. The configurability and default-setting discussion is a distraction here. The Index Join must not treat obtaining `user_id` as optional when the shown `status` index does not contain it. Hash Join needs build and probe as visible concepts, multiple join keys in the example, a reason to prefer a smaller build input, and a concise TiDB/TiKV boundary. It should also make clear that scanning and in-memory matching avoid the per-row inner lookup of Index Join.
+
+Replaced the configuration paragraph with the two row-handle layouts and labelled the nonclustered primary-key index. Added another paid order and users so the examples show two join keys. Clarified the index-to-row read, bolded build/probe, expanded the Hash Join map, and reduced the execution-boundary text to TiDB hash matching, TiKV scans/filters, and the avoided repeated lookup.
+
+## 2026-08-29 14:10 CST - Operators Need a Concrete DAG
+
+COP 606's operator section did not add enough beyond COP 503. It named a filter and aggregate without explaining their work, then repeated the high-level cop task path. The chapter needs a more concrete, slightly richer DAG that gives the reader a feeling for how scan, filter, aggregation, and TopN cooperate and what TiKV returns to TiDB.
+
+Replaced the repeated execution-path diagram with a grouped `SUM` query. It defines the four operators, shows Region-local filtering and partial aggregation below TiDB's final aggregation and TopN, and explains the bottom-up pull flow with a `user_id` partial-sum example.
+
+## 2026-08-29 14:07 CST - Primary-Key Defaults and Hash Join Roles
+
+In COP 606, the clustered-primary-key example left an essential question unanswered: whether it is the default layout, when TiDB uses a hidden internal row ID instead, and whether the choice is configurable. The Hash Join description also needed a concrete example and an explicit execution boundary: in the normal TiKV coprocessor path, TiKV provides planned scans and pushed-down filters, while TiDB performs hash-table matching.
+
+Added the current configurable default and explicit DDL choices, named `_tidb_rowid` for the nonclustered layout, and retained a clustered example for the rest of the chapter. Added a `users` table and a build/probe Hash Join example for the existing SQL query, including the partial hash table and the TiDB/TiKV division of work.
+
+## 2026-08-29 13:59 CST - Primary-Key Terms and SQL Readability
+
+COP 606 should use paragraph boundaries to separate the recap, the chapter's purpose, and the SQL-to-KV contrast. `Clustered` and `nonclustered` primary keys cannot appear as unexplained labels: first show whether the SQL primary key itself is the TiKV row handle or whether a hidden handle is used with a primary-key index. Introductory join SQL should use full table names rather than unhelpful single-letter aliases.
+
+Separated the opening into three connected paragraphs. Reordered the primary-key explanation around the two row-handle layouts before naming them clustered or nonclustered. Replaced aliases with `orders` and `users`, and added a skill rule to avoid aliases in introductory SQL examples.
+
+## 2026-08-29 13:52 CST - Coprocessor Examples and Join Intuition
+
+In COP 606, the first paragraph should connect the earlier coprocessor chapter to what this chapter will explain, without a separate abrupt sentence. Key examples need to account for omitted values and must not introduce an email absent from the table. An index scan being long does not imply it should be cheap, so the index-lookup cost needs direct wording. Seek and scan are their own access-shape idea, not a continuation of the optimizer paragraph. The join section needs to start with two tables and explain outer versus inner before describing index join and hash join.
+
+Merged the opening into one bridge from COP 503. Made the `orders` schema self-contained with a unique `order_number` index and a labelled omitted non-unique index value. Reworded index lookup, separated seek/scan, and rebuilt join access patterns around outer/inner and build/probe mental models. Added a skill rule requiring self-contained examples and explicit omissions.
+
 ## 2026-08-29 13:41 CST - Informative Commit Messages
 
 Commit messages should let a future reader understand the content of the change without opening the diff. They must name the kind of edit and affected chapters or area, rather than using broad messages that only say something was developed or refined.

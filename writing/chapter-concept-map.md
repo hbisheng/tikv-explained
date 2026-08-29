@@ -111,7 +111,7 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 ## COP 606: Coprocessor Patterns
 
 - **Depends on:** cop task, Region-scoped scans, and read pool from 503; RocksDB scans from 403; snapshot from 501-502.
-- **Introduces:** simplified TiDB row/index encoding, table ID, index ID, clustered and nonclustered primary-key layout, row handle, unique/non-unique index layout, table range scan, index scan, index lookup, back-to-table read, seek versus `next`, index join, hash join, and operator DAG pull flow.
+- **Introduces:** simplified TiDB row/index encoding, table ID, index ID, clustered and nonclustered primary-key layouts, hidden `_tidb_rowid`, row handle, unique/non-unique index layout, table range scan, index scan, index lookup, back-to-table read, seek versus `next`, index join, hash join build/probe roles, and operator semantics, partial versus final aggregation, and DAG pull flow.
 - **Core flow:** TiDB encodes rows and indexes into ordered key intervals -> query access selects a row or index interval -> each Region task takes a snapshot, scans or seeks the needed keys, runs its operators -> TiDB combines partial results.
 - **Deferred:** exact byte encoding, code-level executor implementation, task yielding, concurrency/resource limits, cop timing, and iterator statistics in 707.
 
