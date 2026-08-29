@@ -4,6 +4,12 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-29 12:31 CST - Write Pressure Beyond Memtables
+
+ROCKSDB 704 should not frame flow control as only a memtable issue. The opening needs a broader title and needs to connect immutable memtables, L0 backlog, and compaction backlog as pressure signals across one write path.
+
+Renamed the section `Write Pressure and Flow Control`. It now introduces the three signals, their default thresholds, and the distinction between scheduler rate limiting for memtable/L0 pressure and progressive write rejection for pending compaction bytes.
+
 ## 2026-08-29 12:26 CST - Compaction Publication Without Internal Names
 
 The previous compaction paragraph was close, but “old and new files do not mix” could be read too broadly: a current file set can contain new output alongside unrelated older SSTs. The accurate mechanism involves internal `Version` and `SuperVersion` objects, but those names should not appear without an introduction. The chapter should express only the reader-facing guarantee: a flush or compaction never exposes a partially installed file set, while old references delay deletion.

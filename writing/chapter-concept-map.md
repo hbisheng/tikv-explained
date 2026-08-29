@@ -146,7 +146,7 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 ## ROCKSDB 704: RocksDB Details
 
 - **Depends on:** WAL, memtables, SST files, levels, and compaction from 605; MVCC version layout in `write` CF from 404; Raftstore apply batches from 501.
-- **Introduces:** memtable pressure, TiKV write flow control, `memtables-threshold`, WriteThread, write group, grouped WAL append, conditional parallel memtable insertion, prefix seek, raw-key prefix, Bloom filter, compaction seed file, clean cut, compaction overlap expansion, background compaction jobs, subcompaction, and compaction guard.
+- **Introduces:** write pressure, immutable memtable backlog, L0 file backlog, pending compaction bytes, TiKV write flow control, `memtables-threshold`, `l0-files-threshold`, soft/hard pending-compaction limits, WriteThread, write group, grouped WAL append, conditional parallel memtable insertion, prefix seek, raw-key prefix, Bloom filter, compaction seed file, clean cut, compaction overlap expansion, background compaction jobs, subcompaction, and compaction guard.
 - **Core flow:** concurrent WriteBatches form an ordered write group -> WAL and memtable insertion -> compaction selects a self-contained overlapping range -> independent jobs or subcompactions perform the rewrite -> output files respect practical size boundaries.
 - **Deferred:** workload-specific tuning and code-level RocksDB picker implementation.
 
