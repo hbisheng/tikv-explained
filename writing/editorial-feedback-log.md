@@ -4,6 +4,132 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-30 12:54 CST - Start COP 706 at the Read-Pool Task Boundary
+
+COP 706 should begin with the direct fact that TiKV represents a cop request as a task in the unified read pool, not a process-and-thread recap. Explain the pool through workers and tasks, introduce Future polling before YATP's state machine, and explain `Pending` positively as a worker becoming available for other work. The single-level queue needs the actual new-task route rather than merely naming local queues and work stealing.
+
+Rewrote the opening around cop tasks and the unified read pool, removed the TiKV 201 detour and duplicate pool section, and made the Future section executor-neutral before entering YATP's states. The single-level description now says that externally submitted tasks enter the shared injector, workers pull batches into local queues, and idle workers steal batches when needed. Updated the concept map to remove the unnecessary process dependency.
+
+## 2026-08-30 01:45 CST - Rebuild ROCKSDB 804 Around the Safe-Point Boundary
+
+ROCKSDB 804 should receive the same source-checked pre-review treatment as 801 through 803. It needs to derive MVCC garbage collection from the history guarantee established in TXN 404, introduce transaction and GC safe points in their actual order, and distinguish the logical decision that history is obsolete from the physical mechanism that removes it. The chapter must not claim that every key always retains one version at or below the safe point, blur a TiKV MVCC `Delete` with a RocksDB deletion marker, or imply that a compaction over `write` CF can silently clean `default` CF as part of the same SST output.
+
+Rebuilt 804 around GC lifetime, transaction-safe-point lock resolution, GC-safe-point publication, and separate boundary rules for `Put` and `Delete`. The direct path now follows one key through paired `write`/`default` CF mutations. The compaction-filter path explains opportunistic `write` CF cleanup, its separate `default` CF deletion batch, and why a boundary `Delete` remains until bottommost-level cleanup can remove everything it hides. Updated the concept map after checking the TiDB GC ordering and the traditional GC and compaction-filter implementations in the local TiKV checkout.
+
+## 2026-08-30 01:38 CST - Rebuild TXN 803 Around a Volatile Reservation
+
+TXN 803 should receive the same source-checked pre-review treatment as 801 and 802. The chapter needs to establish what a pessimistic lock means before optimizing it, distinguish this feature from the concurrency manager, and explain why losing a leader-local lock may cause a retry without causing an incorrect commit. The leader-transfer path must preserve the exact ordering and evidence: freeze new memory locks, persist the live reservations, apply an ordered fence on the target, receive the second acknowledgement, and only then enter `raft-rs` leader transfer. Code-level table statuses and race bookkeeping should support that model rather than become the chapter structure.
+
+Rebuilt 803 from one writer-reservation example. The chapter now contrasts persistent and in-memory acquisition, explains the merged memory/`lock` CF view, term and Region-version validation, persistent fallback, and removal only after a later Raft command applies. It derives unexpected lock loss from the reservation semantics, then follows planned leader transfer through table freezing, exclusion of pending-removal entries, lock persistence, the `TransferLeader` apply fence, and the second acknowledgement. Removed configuration values, shared-lock details, and code-status narration; updated the concept map after checking both Raftstore implementations, the scheduler, MVCC reader, and transfer-leader tests in the local TiKV checkout.
+
+## 2026-08-30 01:29 CST - Rebuild RAFTSTORE 802 Around Tick Suppression
+
+RAFTSTORE 802 should receive the same source-checked pre-review treatment as the other later chapters. It needs to begin with the concrete cost of ticking many idle Region peers, distinguish follower-local checks from the leader's group-wide decision, and explain how TiKV can stop normal ticks without presenting hibernation as part of the basic Raft protocol. The failure path must be honest about the tradeoff: stale checks preserve a route back to election, but leader failure is detected more slowly. Internal states should appear only after their purpose is clear, and the old busy-apply fix history should not interrupt the main mechanism.
+
+Rebuilt 802 around base ticks, eligibility, hibernation agreement, direct wake-up, and failed-leader detection. The chapter now derives the CPU benefit from the many-Region model in 701, explains the leader's replication/apply checks and quorum responses, and gives the two-check polling delay and skipped-tick behavior their correctness purpose. It introduces `Idle`, `PreChaos`, `Chaos`, and `Ordered` through the stale-check flow, states the five-minute default and slower recovery tradeoff, removes the code-history section, and updates the concept map. The behavior and defaults were checked against the local TiKV hibernation state, peer tick, and integration-test code.
+
+## 2026-08-30 01:18 CST - Rebuild RAFTSTORE 801 Around Two Raft Groups
+
+RAFTSTORE 801 should receive the same source-checked pre-review treatment as the detailed Level 7 chapters. Region merge must be understandable as a protocol, not as a sequence of code callbacks: explain why combining two independent Raft groups needs two commands, what source and target each decide, why peer placement is aligned first, and why source-log catch-up is required on every store. Keep lifecycle races and crash-state machinery for 901, but do not hide a correctness boundary behind vague phrases such as “necessary logs” or “finish the metadata change.”
+
+Rebuilt 801 from the split-to-merge transition and one concrete pair of key ranges. Added the preliminary replica-alignment step and distinguished its possible data movement from the metadata-oriented merge itself. Derived `min_matched`, the retained log interval, and source freezing before introducing `PrepareMerge`; then followed `CommitMerge` through target-group commitment, per-store source catch-up, and the paired target/source metadata update. Clarified the rollback point, removed duplicated full-flow narration, updated the concept map, and checked the stages against both current Raftstore implementations in the local TiKV checkout and PD's merge operator.
+
+## 2026-08-30 00:59 CST - Reduce ROCKSDB 704 to Flow Control and Compaction
+
+ROCKSDB 704 did not need to be a survey of every RocksDB detail. Drop concurrent write grouping and prefix seeking. Keep the one pressure-to-compaction path: TiKV flow control, the compaction picker, compaction parallelism, and Region-aware output files. Explain each directly and leave parameters and internal mechanics out.
+
+Rebuilt 704 as those four sections. The flow-control section keeps its pre-Raftstore boundary and the distinction between byte-rate delay and busy rejection. The rest follows one compaction from picker selection, through bounded jobs and subcompactions, to compaction-guard cuts at Region boundaries and their benefit to Region cleanup. Removed writer grouping, prefix seek, configuration landmarks, and surplus diagrams; updated the concept map to defer them.
+
+## 2026-08-29 23:51 CST - Reduce RAFTSTORE 703 to the Three Region-Data Jobs
+
+RAFTSTORE 703 had too many terms and side paths. It should introduce only the three related background jobs: hand off snapshot generation, apply a received snapshot, and remove destroyed-Region data. Start with destruction, derive the sequence-number wait from ongoing reads, then explain whole-file versus boundary-key deletion. Snapshot application needs one precise distinction: range checks prevent a live or pending metadata conflict, but a destroyed peer can leave deferred physical data that must be cleared before ingestion. State the L0 admission boundary plainly and leave the rest out.
+
+Rebuilt 703 around that order. It now identifies the Region worker directly as a Raftstore component, lists its three responsibilities, then gives snapshot generation one forwarding sentence before destruction and application. The chapter records a removed replica's range and sequence, then completes destruction with whole-file and boundary-key deletion. Snapshot apply distinguishes live metadata from deferred physical cleanup, forces overlapping deferred deletion before SST ingestion, and states the default more-than-10-L0-files delay. Updated the concept map to match and deferred lifecycle-specific overlap cases.
+
+## 2026-08-29 23:36 CST - Rebuild TXN 708 Around the Commit Decision
+
+TXN 708 should not describe Async Commit as though one remaining lock simply proves that the transaction committed. The chapter needs to start from the foreground wait in classic 2PC, then explain exactly what replaces that primary-commit decision: every lock carries a minimum commit timestamp, the primary records the secondary keys, and the complete persisted participant state makes one outcome recoverable. 1PC should be equally concrete about its boundary: all mutations fit in one prewrite batch for one Region, so TiKV can write the committed MVCC records directly. The Concurrency Manager belongs only after these paths are clear, where it can solve the specific race between timestamped reads and state not yet visible in RocksDB.
+
+Rebuilt 708 in that order and checked the protocol against the local TiKV source and the client-go version used by the local TiDB checkout. The new chapter separates `min_commit_ts` from the final `commit_ts`, explains all-secondary recovery rather than single-lock inference, identifies TiDB's foreground and background work, gives 1PC its one-Region boundary, and derives `max_ts` plus the in-memory lock table from two concrete race orderings. Updated the concept map and added the durable rule that a protocol optimization must explain what correctness evidence replaces the step it removes.
+
+## 2026-08-29 23:18 CST - Distinguish Slow Classification from Leader Eviction
+
+RAFTSTORE 702 must not confuse PD's slow-store classification with its leader-eviction action. A score of 80 marks a Store as slow, but the disk slow-store scheduler begins leader eviction only at 100. The chapter's purpose is the action that protects request latency, so it should state only the latter threshold rather than introducing a distinction it does not need to explain.
+
+Corrected 702 and its concept map to say that PD transfers leaders once the single slow Store reaches 100. Recorded the 80-versus-100 boundary after checking the local PD scheduler: 80 is the `IsSlow` classification threshold, while the eviction scheduler requires a score of at least 100.
+
+## 2026-08-29 23:00 CST - Rebuild COP 707 Around One Request's Execution
+
+COP 707 should receive the same source-checked, pre-review treatment as 702 through 706. It must connect COP 606's storage access patterns to COP 706's Future lifecycle without turning into a loose metrics catalog. Yielding, resource admission, read-pool scheduling, concurrency limits, and iterator statistics need distinct boundaries, and names such as `item`, `wait`, and `running tasks` must not be interpreted casually.
+
+Rebuilt 707 around one cop request from parsing through snapshot acquisition, handler construction, cooperative scanning, and response. Corrected the scanner from a fixed 32-row yield to elapsed-time checks at new ranges and every 32 returned keys, explained the non-strict 1 ms boundary, and separated resource-control admission from the heavy-task semaphore. Re-derived cop and YATP timing signals from their actual instrumentation, corrected Running Tasks to include all admitted unfinished tasks, and distinguished TiKV MVCC iterator operations from RocksDB internal skipped-key counters. Updated the concept map and added a durable rule requiring metric prose to preserve the actual measurement boundary.
+
+## 2026-08-29 22:49 CST - Rebuild COP 706 Around the Future Lifecycle
+
+COP 706 should receive the same pre-review treatment as the preceding detailed chapters. The old draft buried YATP's actual programming model beneath generic process and thread background, a cross-version pool table, and a metrics catalog already better suited to 707. It also described multi-level queues as if they assigned longer time slices to lower levels, without first making the cooperative `poll()` boundary precise.
+
+Rebuilt 706 around one cop task waiting for a Region snapshot. It now distinguishes TiKV tasks from worker threads, derives `poll()`, `Pending`, and wakers from that wait, then introduces YATP's four task states and the boundary between OS preemption and cooperative Future scheduling. The unified read-pool scope and single-level, multi-level, and priority queues now follow the core loop; the multi-level description uses accumulated execution time rather than invented time-slice lengths. Version history and metrics moved out of the chapter, 707 receives the cop-specific performance details, and the concept map was updated from the pinned local YATP and TiKV source.
+
+## 2026-08-29 22:48 CST - Reduce RAFTSTORE 702 to the Slow-Store Decision
+
+RAFTSTORE 702 should keep only the full slow-store decision: a TiKV can be half-dead rather than crashed; TiKV detects repeated disk stalls, scores them with fast escalation and slow recovery, and PD moves leaders away. The Raft path needs its append-complete boundary, and the KV probe needs its separate-disk boundary. Everything else is noise for this chapter.
+
+Rebuilt 702 around that four-step chain. It now states the Raft inspection and KV-probe layout, the 100 ms / 30-tick / 10% / five-minute scoring defaults, the algorithm parameters, and PD's default score-80 leader eviction. Removed detailed worker paths, CPU and network behavior, diagrams, and a repeated conclusion; the concept map now defers those details.
+
+## 2026-08-29 22:39 CST - Rebuild ROCKSDB 705 Around Value Separation
+
+ROCKSDB 705 should receive the same pre-review standard as 702 through 704: derive Titan from a concrete LSM-tree cost, introduce its terms only when the reader needs them, and verify the actual TiKV boundary instead of polishing the old draft's assumptions. In particular, the chapter must not imply that an incoming write immediately places its value in a blob file, blur which column family uses Titan, or describe ratio-based GC as if it could delete individual records in place.
+
+Rebuilt 705 from one large `default` CF value moving through flush and compaction. The chapter now preserves the WAL and memtable path, places key-value separation in SST construction, defines a BlobIndex through the read path, and explains why immutable blob files need ratio-based rewriting. It distinguishes transaction GC, RocksDB compaction, and Titan blob GC; records Titan's current new-cluster and column-family defaults without upgrade history; and updates the concept map with the corrected dependencies and deferred implementation details. The behavior was checked against the local TiKV configuration and its pinned Titan source.
+
+## 2026-08-29 22:31 CST - Give ROCKSDB 704 One Coherent Pressure and Concurrency Model
+
+ROCKSDB 704 should receive the same pre-review treatment as 702 and 703: build directly on the completed 605 model, define every new mechanism when it becomes necessary, and do not let a collection of implementation details become the chapter structure. The existing draft needed a clearer relationship between foreground writes and background storage pressure, could not rely on the transaction scheduler before 607 introduces it, and should not present CPU-derived compaction concurrency as a fixed default. Terms such as compatible writer, Bloom filter, and compaction picker also needed actual reader-level meanings.
+
+Rebuilt 704 around the LSM tree under load. It now derives TiKV flow control from immutable-memtable, L0, and pending-compaction backlogs; distinguishes byte-rate delay from probabilistic busy rejection; and states the earlier control boundary relative to RocksDB write stalls. The chapter then follows concurrent `WriteBatch`es through WriteThread group commit, introduces point-read prefix seeking and Bloom filters from one MVCC key, and explains compaction file expansion, non-conflicting jobs, subcompactions, and Region-aware output cuts. Corrected `clean cut` to refer to one RocksDB key's internal sequence versions rather than TiKV MVCC versions, fixed the resource-derived concurrency wording, deferred scheduler internals to 607, and updated the concept map.
+
+## 2026-08-29 22:23 CST - Rebuild RAFTSTORE 703 Around the Receiving Side
+
+RAFTSTORE 703 should meet the same pre-review standard as the corrected 702: inherit the book's established flow, introduce one concrete storage problem, and avoid presenting a worker responsibility list as if that were an explanation. The previous draft repeated snapshot generation from 603, incorrectly assigned it to the Region worker in current TiKV, and mixed metadata overlap, snapshot application, delayed deletion, and deletion methods without first establishing how they are connected.
+
+Rebuilt 703 around the receiving side of the snapshot path. It now distinguishes live Region metadata from stale physical data, follows range validation, cleanup, SST ingestion, and replication resumption in order, then derives delayed peer-data deletion from active RocksDB snapshots and sequence numbers. The file/key deletion strategies and the ordering between pending deletion and snapshot installation now serve that central flow. Snapshot generation is correctly assigned to its separate pool, while durable apply markers and split/merge lifecycle races remain deferred to 901; the concept map was updated to match.
+
+## 2026-08-29 21:34 CST - Make RAFTSTORE 702 Read Like the Book
+
+The first rewrite of RAFTSTORE 702 may have been source-checked, but it read like an implementation audit rather than a chapter from this book. The opening stacked heartbeat, KV-disk, range, and score facts before giving the reader a reason to care. You expected the writing to learn from completed chapters such as 501, 502, 606, and 607: connect naturally to an earlier idea, introduce one concrete problem, and let the mechanism emerge from that problem instead of presenting a catalog of verified details.
+
+Rebuilt 702 around a single narrative inherited from RAFT 601: PD can move leaders, but it first needs to distinguish a store that is persistently slow from a brief latency spike. The chapter now proceeds through Raftstore inspection, score accumulation, the second KV-disk path, and leader eviction. Removed the opening scale diagram, reduced implementation narration, dropped the inspection ID, and shortened the chapter while retaining the source-verified timeout, CPU-busy, scoring, and recovery behavior. Added a durable skill rule that nearby completed chapters are style anchors and source verification must not dominate the prose.
+
+## 2026-08-29 21:25 CST - Rebuild RAFTSTORE 702 from the Actual Slow-Score Boundary
+
+RAFTSTORE 702 needs to withstand a detailed review, not merely turn old implementation notes into polished prose. The chapter should begin with the reader-facing problem of a store that is alive but persistently slow, then establish exactly what TiKV measures, how repeated observations become a score, and what PD does with that signal. It must follow the accumulated editorial rules: define every new component by its role, keep code names and parameter lists from taking over the explanation, and verify current behavior from local TiKV source so the text does not preserve stale assumptions about proposal latency, configuration, or busy apply.
+
+Rewrote 702 around the separation between measurement, scoring, and cluster response. The chapter now traces the Raftstore inspection marker to the Raft write boundary, explains timeout and CPU-busy filtering, derives the 30-tick score update and asymmetric recovery with examples, distinguishes Raft-disk, KV-disk, and separate network scores, and connects a score of 100 to PD leader eviction. Removed the obsolete function tour, the inaccurate proposal-path diagram, and the unrelated busy-apply thresholds; updated the concept map with the corrected dependencies and deferred topics. The behavior was checked against the local TiKV and PD checkouts.
+
+## 2026-08-29 21:10 CST - Use Dividers for Chapter-Level Returns
+
+The horizontal divider in RAFTSTORE 701 makes an important structural boundary visible: a local mechanism, such as yielding, has ended, and the text is returning to the chapter-level model. That clarity should be applied across the book where it actually resolves this kind of ambiguity, but never turned into page decoration or a separator between ordinary sections.
+
+Added dividers before whole-chapter takeaways or forward pointers in RAFT 401 and 402; ROCKSDB 403, 605, 704, 705, and 804; RAFT 602; RAFTSTORE 604 and 802; and TXN 607, 708, and 803. Left normal section transitions and chapters that already end on their complete flow unchanged. Added the durable divider-placement rule to the editing skill.
+
+## 2026-08-29 21:08 CST - RAFTSTORE 701 Batch-System Review
+
+RAFTSTORE 701 needs to make the two layers of batching visible rather than merely naming queues: many events for one Region collect in its mailbox, then an idle mailbox sends its FSM to a shared scheduler queue consumed by multiple pollers. Define a poller before using it and keep Rust ownership details out. Explain rounds through their reader-facing fairness rules: the configurable batch-size limit is `256` by default, every round admits at least one fresh FSM, and **rescheduling** moves roughly half of long-running hot FSMs after the default five-second threshold. The Raft path should name `step()` and the default 4,096-event per-peer turn. The apply path needs its own precise picture: one shared `WriteBatch` can write RocksDB multiple times in a turn, unlike one Raft Engine write I/O task per Raft batch round; yielding is checked for the current Region after those persistence points and trades fairness for a slower hot-backlog drain. Remove diagrams and summaries that only restate prose, and give the chapter a warm closing without pretending it introduces a new concept.
+
+Rebuilt the queue diagram to show the two batching layers and multiple pollers. Reordered definitions, added the default batch, reschedule, and per-peer event limits, and connected message handling to `step()` and the proposal API. Rewrote the apply section around shared `WriteBatch` persistence, the 32 KiB / 500 ms yield conditions, repeated RocksDB writes, and the hot-Region tradeoff. Removed redundant diagrams and repeated conclusions, then separated the friendly final summary from the yield section with a divider. All TiKV behavior was checked against the local `/data/ssd1/tikv` checkout.
+
+## 2026-08-29 20:08 CST - State the Batch-System Boundary Directly
+
+The opening of RAFTSTORE 701 should say plainly that the two systems use batching to combine small, independent operations into fewer larger I/O operations. It also needs to explain the real tension: TiKV batches work across Regions while keeping each Region's events in order. “Workers share physical work” is too abstract to carry either idea.
+
+Rewrote the two opening sentences around batching and the per-Region ordering boundary.
+
+## 2026-08-29 20:02 CST - Pre-Review RAFTSTORE 701
+
+Before formal review, RAFTSTORE 701 should be checked against the accumulated writing rules and the local TiKV implementation. Its reader-level point is the scheduling boundary: one Region remains ordered, while shared workers batch independent work across Regions. Code-method names, tuning defaults, and metrics must not take over that story. Verification should start from the local TiKV checkout rather than an upstream web source.
+
+Reworked 701 around event routing, poller rounds, Raft `Ready` batching, and ApplyFsm yielding. Removed code-method names, incidental defaults, and the metrics/tuning section; clarified the kinds of events and the per-Region ordering boundary. Updated the concept map to defer implementation and diagnostic details, and added the local-source-first verification rule to the editing skill.
+
 ## 2026-08-29 19:36 CST - Keep TXN 607 on Its Core Flow
 
 In TXN 607, the primary-key commit needs the acting subject: TiDB sends that commit. The scheduler-metrics section is not necessary at this level and interrupts the transaction-command story.
