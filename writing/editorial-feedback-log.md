@@ -4,6 +4,96 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-08-30 23:17 CST - Make RAFTSTORE 901 Add Only Recovery Boundaries
+
+RAFTSTORE 901 should build on the normal replica, snapshot, split, and merge paths already explained in 602 through 604, 703, and 801. Repeating those paths makes the chapter broad but not additive. Its distinct value is the durable state that survives a restart, the one cross-engine snapshot boundary, the in-memory guards that serialize overlapping transitions, and the narrow merge-recovery decision.
+
+Replaced the normal-operation retelling with references to the earlier chapters. Rebuilt 901 around the three persistent peer records, startup behavior for each lifecycle state, `snapshot_raft_state_key`, three live-process guards, and `Merging` recovery by target epoch and peer ID. Updated the concept map to defer low-level cleanup and lock-order details instead of treating 901 as an exhaustive implementation reference.
+
+## 2026-08-30 23:16 CST - Restore ROCKSDB 804 to the Release-8.5 Safe-Point Flow
+
+ROCKSDB 804 describes release-8.5 and must not import the later master-only Transaction Safe Point API or turn it into a transaction-admission rule. The release-8.5 model has one GC safe point: GC lifetime proposes a candidate, active transactions and registered service safe points may hold it back, old locks are resolved, TiDB safe-point caches are refreshed, and only then is the value published to PD for TiKV's physical reclamation.
+
+Removed the transaction-safe-point stage and its read-rejection diagram. Rebuilt the section around the release-8.5 candidate, its two limiting inputs, global lock resolution, TiDB cache refresh, and final PD publication. Updated the concept map and added a durable editing rule that a versioned chapter must be checked against that release rather than current master.
+
+## 2026-08-30 22:00 CST - Rebuild RAFTSTORE 802 Around Hibernation Roles
+
+RAFTSTORE 802 should establish one readable hibernation model rather than lead with a checklist of implementation conditions. A follower can stop its own ticks from local state because a living leader's heartbeat wakes it again; a leader needs stricter group-wide evidence because stopping it also stops regular heartbeats. The leader must obtain quorum agreement through a two-round poll, while skipped ticks deserve their own quick-election explanation. Multi-minute failure detection is acceptable for a traffic-free group because a request wakes it promptly, and the `Idle`, `PreChaos`, `Chaos`, and `Ordered` names need meanings before the state flow uses them.
+
+Reduced the opening to idle-tick CPU cost and the chapter's three questions. Rebuilt the eligibility section around the follower/leader distinction, explicit leader poll and next-election-timeout confirmation, and scannable leader requirements; removed repeated and implementation-only checks. Moved skipped-tick replay into a standalone quick-election section, simplified wake-up text, defined the stale-check states before the diagram, and made the traffic-versus-slow-failure-detection tradeoff explicit.
+
+## 2026-08-30 20:23 CST - Reduce RAFTSTORE 801 Source Preparation to the Handoff
+
+The source-preparation section should show the reader the actual handoff path, not exhaust every validation branch. Start from source followers' matched indices, derive the logs that need preserving, then show `PrepareMerge` freezing writes. A vague "log boundary" obscures this flow, and a catalog of snapshots, configuration commands, and metadata checks distracts from it.
+
+Rewrote the section around the lowest matched index and retained source logs. It now keeps only the representative retry conditions of a badly lagging peer or excessive retained history, then follows the `PrepareMerge` proposal and source write freeze. Updated the concept map to replace the abstract boundary with the matched-index handoff.
+
+## 2026-08-30 20:12 CST - Give PD's Region-Merge Decision Its Thresholds
+
+RAFTSTORE 801 should establish why PD starts a merge, not only what happens after it does. State the scheduler configuration that identifies a merge candidate and give its current defaults, but do not turn this implementation chapter into a broad scheduling-eligibility catalog.
+
+Added PD's `max-merge-region-size` and `max-merge-region-keys` candidate rule before peer alignment: a Region must be at or below the default `54 MiB` and `540,000` approximate-key limits before PD considers merging it with an adjacent Region. Updated the concept map to begin the merge flow with PD finding that undersized Region.
+
+## 2026-08-30 20:07 CST - Keep RAFTSTORE 801's Overview Concrete but Light
+
+RAFTSTORE 801 should show its overall merge flow early without attempting to explain every command before the reader has the problem in mind. The overview must still say what each step means; bare labels in an arrow diagram do not establish a usable model. The source write freeze and two-command coordination are important enough to name, while their mechanisms belong in their later sections.
+
+Moved the two-command list back into the introduction without its detailed explanation, moved the flow overview beside it, and replaced its poorly expressive arrow diagram with five concise action-and-purpose bullets. The source section now states that `PrepareMerge` makes the leader reject ordinary writes, and the retained-history diagram labels `PrepareMerge` without fragile whitespace alignment. Also expanded the RAFT 602 reference to its full title.
+
+## 2026-08-30 19:02 CST - Let RAFTSTORE 802 Start With the Idle-Peer Problem
+
+RAFTSTORE 802's opening should not compress the whole hibernation design into its first screen. Start gently from the recurring tick work of many idle peers and the purpose of pausing it. Eligibility checks, group agreement, wake-up behavior, skipped ticks, and leader-failure recovery each need to arrive only in the section that explains them.
+
+Rebuilt the opening around the tick's basic purpose, the many-idle-peer CPU cost, and hibernation as a scheduling optimization that preserves Raft state. Removed the opening tick diagram and default configuration detail, then added a short chapter guide to the three later questions: when a group may sleep, how work wakes it, and how failure is detected.
+
+## 2026-08-30 18:28 CST - Let TXN 708 Lead With the Commit Difference
+
+TXN 708's opening should introduce the two ideas gently and positively before their mechanics: completed Async Commit prewrites let TiDB return, while 1PC applies when a transaction involves one Region. It should not begin by denying an imagined change to `write` CF, anticipate the concurrency-manager section, or use diagrams that merely reformat adjacent prose. In the 1PC section, the immediate contrast after Async Commit's locks is that successful 1PC writes no persistent transaction locks.
+
+Replaced the negative opening with a two-path preview, removed the classic-2PC and Async-Commit flow diagrams, and deferred concurrency-manager context to its section. Reworded the Async Commit summary around completed prewrites and the 1PC summary around its one-Region condition. Reordered the 1PC section so the no-persistent-lock contrast follows the Async Commit lock statement directly, then explains the one-batch condition and direct committed-record write.
+
+## 2026-08-30 18:15 CST - Keep TXN 708 at Its Protocol Boundaries
+
+TXN 708 needs accurate protocol roles where they affect the reader's main model, but should not turn into an audit of value encodings, recovery bookkeeping, or scheduler guards. Recovery must distinguish a missing lock with no commit record from a committed key, 1PC needs separate client-attempt and TiKV-fallback boundaries, and Async Commit must not be described as choosing its final timestamp inside TiKV.
+
+Replaced the per-key value claim with persisted lock and required value data, limited the primary's secondary list to recovery, and made a missing lock without a commit record a rollback outcome. Clarified that TiDB attempts 1PC only for one prewrite batch, TiKV can still produce ordinary 2PC locks, and TiDB then continues with 2PC. The concurrency-manager setup now distinguishes Async Commit's TiDB-selected final timestamp from 1PC's TiKV-selected timestamp. Updated the concept map and limited the closing claim to committed write transactions.
+
+## 2026-08-30 17:08 CST - Make COP 707's Boundaries Concrete
+
+COP 707 must state the actual scanner cadence and threshold rather than leave "periodically" and "too long" undefined. The long-task limiter also needs its real trigger, but resource-control admission should disappear because the book has not introduced resource control. Its timing section should be a short explanation of the relevant boundaries, not a second metrics reference.
+
+Specified the first-key-after-new-range check, 32-key checkpoints, and the non-strict 1 ms scanner time slice. Replaced admission material with the unary-handler rule: after more than 5 ms of accumulated active poll time, a still-pending handler needs a semaphore permit before another poll. Reduced timing text to schedule wait, snapshot wait, process time, and suspension; removed the YATP panel catalog and duplicated flow diagram. Updated the concept map accordingly.
+
+## 2026-08-30 16:53 CST - Keep COP 707 to Its Execution Boundaries
+
+COP 707 was repeating the cop request path already established in COP 503 and 606, then adding implementation-level scan counters that did not advance the chapter's purpose. Its value is narrower: show where a cop task yields, which controls can make it wait, and how TiKV separates those waits from execution time. Snapshot acquisition belongs only as the meaning of the snapshot-wait boundary, not as another end-to-end request-flow section.
+
+Removed `From Request to Execution`, its repeated flow diagram, the streaming detour, and all TiKV/RocksDB scan-statistics material. Rebuilt the opening around the distinct waiting and execution boundaries, retained the range-scanner yield mechanism and admission/concurrency controls, and made the tracker and YATP timing signals the chapter's core. Updated COP 606's forward link and the concept map to match.
+
+## 2026-08-30 16:40 CST - Explain the Human Work Behind the Book
+
+The preface should be candid about why this book remains a human writing project even when coding agents can quickly inspect implementation details. The important human work is building the big picture and accurate mental models. Agents still tend to produce technical prose with broken logical flow, unintroduced concepts, assumed knowledge, distracting statements about what something is not, expressions that are neither natural nor clear at a glance, and long recaps that add no useful information. The book should introduce ideas gradually, with every chapter adding something new; repeatedly commanding an agent to delete redundant text or manually rewriting it sentence by sentence should not be part of the normal workflow. An agent writing everything also leaves no independent review or accuracy audit. This book is instead a curated summary reviewed by a TiKV developer, which does not make it error-free but gives its claims a higher accuracy bar than an unaudited draft. Less is more: the book should contain the core ideas rather than exhaustive details, leave further lookup to the code, and remain a developing piece that can gain new material over time. More fundamentally, agents do not seem to judge what is difficult for a human mind, what carries the essence, and what a book does not need to say. A book that maximizes understanding is therefore hard to write with unsupervised agents, and its value is no longer to duplicate the code as a technical reference but to convey the author's own understanding of TiKV. This passage should retain the author's own wording and tone; polishing it into generic editorial prose kills part of its point.
+
+Kept the original preface and expanded the section after its human-reader statement. It distinguishes code lookup from model building, describes the limitations observed in generated technical writing, calls out redundant chapters that fail to add information, and states the less-is-more boundary between core ideas and code-level detail. It records the actual outline-fill-manual-rewrite-verify workflow, adds the accuracy value of a TiKV-developer-curated summary over an unaudited draft, and frames the book as a developing expression of the author's way of understanding and seeing TiKV. Reworked the passage using the author's original vocabulary and sentence posture, limiting changes to grammar and coherence. It ends with the hope that future agents will make systematic learning in unfamiliar fields much faster.
+
+## 2026-08-30 16:23 CST - Explain Multi-Level Queue Before Its Policy
+
+The multi-level queue section in COP 706 should not jump to task demotion without first explaining the three levels and what differentiates them. Establish their scheduling shares, then show how normal tasks move between them, how fixed priorities bypass that movement, and the response-time benefit and long-task tradeoff.
+
+Rebuilt the section around level 0 through 2, their scheduling role, the default accumulated-running-time thresholds, and YATP's level-0 target share. It now explains that YATP classifies incoming work by execution time already accumulated under its task identifier, distinguishes queue selection from a time slice, gives TiKV's fixed-level mapping for high, low, and background work, and ends with the short-read versus long-task tradeoff. Updated the concept map to name the three-level feedback queue.
+
+## 2026-08-30 16:02 CST - COP 706 Future Explanation Economy
+
+COP 706 should introduce Rust Futures to readers outside Rust without repeatedly restating the same idea. Once `poll()` and its `Ready`/`Pending` results establish the model, state preservation and wakers explain the next step. The task-state section must also clearly distinguish a Future's poll result from YATP's separately recorded scheduling state: `NOTIFIED` means ready to poll, not that the Future returned `Ready`.
+
+Reordered the Future explanation around `poll()`, its results, saved progress, and event-driven waking. Rebuilt the state-machine section around the two layers of state and their transitions, with only the wake-up-during-poll case needed to show why notifications are not lost. Removed repeated Future/task definitions, the duplicate state summary, redundant cooperative-scheduling wording, and the final recap while preserving the scheduling choices and forward link.
+
+## 2026-08-30 13:20 CST - Lead COP 706 With the Future Task
+
+COP 706 should establish a cop task's actual representation and execution model before introducing worker threads. Start from the Future that wraps request work and state, explain how an executor gives it turns through `poll()`, then introduce YATP workers as the implementation that runs ready Futures. The Future section should not use a worker concept before it is defined.
+
+Reordered the opening around a Future task and its executor. The polling and waker explanation now comes first and refers only to the executor; the worker section follows with the YATP queue and the limited worker threads that call `poll()`. Updated the concept map so its core flow begins with creating the Future task.
+
 ## 2026-08-30 12:54 CST - Start COP 706 at the Read-Pool Task Boundary
 
 COP 706 should begin with the direct fact that TiKV represents a cop request as a task in the unified read pool, not a process-and-thread recap. Explain the pool through workers and tasks, introduce Future polling before YATP's state machine, and explain `Pending` positively as a worker becoming available for other work. The single-level queue needs the actual new-task route rather than merely naming local queues and work stealing.

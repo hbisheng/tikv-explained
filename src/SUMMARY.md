@@ -45,7 +45,7 @@
 - [703 Region Worker](703.md)
 - [704 RocksDB Details](704.md)
 - [705 Titan](705.md)
-- [706 YATP Internals](706.md)
+- [706 YATP Read Pool](706.md)
 - [707 Coprocessor Execution](707.md)
 - [708 Async Commit and 1PC](708.md)
 

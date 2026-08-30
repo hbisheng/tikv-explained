@@ -157,39 +157,39 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 - **Core flow:** full value passes through WAL and memtable -> SST construction keeps a small value inline or writes a large value to a blob file -> SST stores its `BlobIndex` -> ordinary compaction moves the index -> obsolete LSM references make blob bytes discardable -> blob GC copies live values, updates their indexes, and retires the old files.
 - **Deferred:** Titan's optional level-merge and range-merge modes, blob cache internals, GC batching and crash-consistency implementation, detailed tuning and metrics, and the transaction-GC and compaction-filter mechanics in 804.
 
-## COP 706: YATP Internals
+## COP 706: YATP Read Pool
 
 - **Depends on:** cop task and read-pool workers from 503; direct storage reads from 403.
-- **Introduces:** worker thread, task, Rust Future, executor, `poll()`, `Ready`, `Pending`, waker, `NOTIFIED`/`POLLING`/`IDLE`/`COMPLETED`, cooperative scheduling, unified read pool, work stealing, and single-level, multi-level, and priority queues.
-- **Core flow:** ready Future is queued as `NOTIFIED` -> worker marks it `POLLING` and calls `poll()` -> `Ready` completes the task or `Pending` leaves it `IDLE` -> external progress invokes its waker -> task becomes `NOTIFIED` and is scheduled again.
+- **Introduces:** worker thread, task, Rust Future, executor, `poll()`, `Ready`, `Pending`, waker, `NOTIFIED`/`POLLING`/`IDLE`/`COMPLETED`, cooperative scheduling, unified read pool, work stealing, and single-level, three-level feedback, and priority queues.
+- **Core flow:** a cop request's work becomes a Future task; YATP keeps a separate scheduling state -> the ready Future is queued as `NOTIFIED` -> worker marks it `POLLING` and calls `poll()` -> `Ready` completes the task or `Pending` leaves it `IDLE` -> external progress invokes its waker -> task becomes `NOTIFIED` and is scheduled again.
 - **Deferred:** cop-specific yield points, timing boundaries, saturation metrics, concurrency and resource limits, and iterator statistics to 707; exact queue internals, task-state races, pool scaling, admission control, and deployment/version history.
 
 ## COP 707: Coprocessor Execution
 
-- **Depends on:** cop task, access patterns, seek, scan, and operators from 503 and 606; cooperative task execution and read pools from 706; MVCC/iterator context from 403-404.
-- **Introduces:** request handler, range-scanner yield checks, resource-control admission, heavy-task concurrency limit, cop request timing boundaries, YATP execution signals, and TiKV/RocksDB scan statistics.
-- **Core flow:** parse request -> admit and enqueue task -> obtain Region snapshot -> build handler -> poll operators and scan RocksDB -> yield at scanner checks -> return results and report timing and storage work.
-- **Deferred:** streaming implementation details, admission and quota algorithms, dashboard-specific diagnosis, and the exact RocksDB iterator implementation.
+- **Depends on:** cop task, access patterns, scan, and operators from 503 and 606; cooperative task execution and read pools from 706.
+- **Introduces:** range-scanner yield checks, the 1 ms scan time slice, long-request concurrency limit, and cop request timing boundaries.
+- **Core flow:** the scanner checks after a new range's first key and at 32-key intervals -> more than 1 ms since the last yield reschedules the task -> a unary handler that remains pending after more than 5 ms of active execution waits for a semaphore permit -> the tracker separates schedule wait, snapshot wait, process time, and suspension.
+- **Deferred:** streaming implementation details, semaphore-group configuration, dashboard-specific diagnosis, and the exact RocksDB iterator implementation.
 
 ## TXN 708: Async Commit and 1PC
 
 - **Depends on:** RocksDB snapshots from 403; 2PC, prewrite, primary and secondary keys, transaction locks, `write` CF, `default` CF, and MVCC visibility from 404; lock resolution from 607.
 - **Introduces:** Async Commit, `min_commit_ts`, recovery metadata, secondary-key list, background commit, one-phase commit (1PC), concurrency manager, `max_ts`, and the in-memory lock table.
-- **Core flow:** Async Commit prewrites every key with enough participant and timestamp information to recover one outcome, then moves commit RPCs out of the foreground; 1PC commits one Region's mutations directly in one prewrite batch; the concurrency manager orders concurrent reads against these prewrites until their state reaches RocksDB.
+- **Core flow:** Async Commit persists prewrite locks with timestamp bounds and a primary recovery list -> TiDB chooses the largest bound as the final timestamp and moves commit RPCs out of the foreground -> 1PC directly commits a one-Region prewrite batch, or falls back to 2PC -> the concurrency manager orders concurrent reads against these prewrites until their state reaches RocksDB.
 - **Deferred:** exact protocol eligibility limits and fallback matrix, recovery RPC formats, asynchronous apply implementation, concurrency-manager data structures, and performance tuning.
 
 ## RAFTSTORE 801: Region Merge
 
 - **Depends on:** Region ranges and PD scheduling from 201; Raft logs, commit, and ordered application from 401 and 501; matched index from 601; peer placement and movement from 602; Region metadata and epochs from 602 and 604.
-- **Introduces:** adjacent source and target Regions, peer alignment before merge, two-Raft-group coordination, `PrepareMerge`, retained source-log interval, `CommitMerge`, fixed merge boundary, local source catch-up, and `RollbackMerge` before target commit.
-- **Core flow:** PD aligns source peers with target peers -> source leader chooses a boundary all source peers can reach -> `PrepareMerge` freezes the source history -> target group commits `CommitMerge` with the required source logs -> each local source catches up -> target range and source removal are persisted together.
+- **Introduces:** PD's merge-size and merge-key thresholds, adjacent source and target Regions, peer alignment before merge, two-Raft-group coordination, `PrepareMerge`, source-log interval kept for merge, `CommitMerge`, fixed merge boundary, local source catch-up, and `RollbackMerge` before target commit.
+- **Core flow:** PD finds an undersized Region and aligns source peers with target peers -> source leader finds the lowest matched index and keeps later source logs available -> `PrepareMerge` freezes the source history -> source leader reads the needed logs for `CommitMerge` -> each local source catches up -> target range and source removal are persisted together.
 - **Deferred:** exact merge-state records, snapshot and peer-GC races, repeated merges, tablet-specific implementation, and crash recovery in 901.
 
 ## RAFTSTORE 802: Raft Hibernation
 
 - **Depends on:** Raft heartbeat, election timeout, and leader/follower roles from 401; Raftstore workers and apply progress from 501.
-- **Introduces:** base tick, logical Raft clock, hibernation, leader-side hibernation polling, skipped ticks, stale check, and the `Idle`, `PreChaos`, `Chaos`, and `Ordered` states.
-- **Core flow:** stable followers pass local checks -> leader verifies replication and apply progress -> leader gathers hibernation responses -> normal base ticks stop -> commands and Raft messages wake peers directly, while stale checks recover from a failed leader.
+- **Introduces:** base tick, logical Raft clock, hibernation, follower-local and leader-wide hibernation checks, two-round hibernation polling, skipped ticks and quick election after wake-up, stale check, and the `Idle`, `PreChaos`, `Chaos`, and `Ordered` states.
+- **Core flow:** a quiet follower can stop its own ticks -> leader verifies group-wide stability and polls followers -> a second election-timeout check confirms quorum approval -> normal base ticks stop -> commands and Raft messages wake peers directly, while stale checks recover from a failed leader.
 - **Deferred:** exact wake-up sites, compatibility handling during rolling upgrades, busy-apply recheck history, and hibernation metrics.
 
 ## TXN 803: In-Memory Pessimistic Locks
@@ -202,13 +202,13 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 ## ROCKSDB 804: GC and Compaction Filter
 
 - **Depends on:** timestamped MVCC versions, `write` CF, `default` CF, transaction locks, and `Put`/`Delete` records from 404; LSM levels and compaction from 605.
-- **Introduces:** GC lifetime, transaction safe point, GC safe point, boundary `Put`, traditional GC, compaction filter, bottommost-level `Delete` cleanup, and logical versus physical MVCC cleanup.
-- **Core flow:** GC lifetime produces a target -> the transaction safe point stops older transactions -> their locks are resolved -> the GC safe point is published -> a boundary `Put` and all newer versions remain, while older history is removed -> direct GC scans keys or the compaction filter removes versions as `write` CF SST files compact -> a boundary `Delete` is removed only after the history it hides is gone.
-- **Deferred:** service safe points and other safe-point blockers, GC scheduling, cleanup failure recovery, compaction-filter thresholds, and production tuning and metrics.
+- **Introduces:** GC lifetime, GC safe point, active-transaction and service-safe-point limits, boundary `Put`, traditional GC, compaction filter, bottommost-level `Delete` cleanup, and logical versus physical MVCC cleanup.
+- **Core flow:** GC lifetime produces a candidate -> active transactions and registered services may hold it back -> locks older than the resulting safe point are resolved -> TiDB refreshes its safe-point caches and publishes the value to PD -> a boundary `Put` and all newer versions remain, while older history is removed -> direct GC scans keys or the compaction filter removes versions as `write` CF SST files compact -> a boundary `Delete` is removed only after the history it hides is gone.
+- **Deferred:** exact service-safe-point registrations, GC scheduling, cleanup failure recovery, compaction-filter thresholds, and production tuning and metrics.
 
 ## RAFTSTORE 901: Raft Peer Lifecycle
 
-- **Depends on:** all earlier Region, Raft, Raftstore, snapshot, split, merge, and replica-movement concepts.
-- **Introduces:** detailed `RaftLocalState`, `RaftApplyState`, `PeerState`, tombstone, apply marker, startup reconstruction, `pending_snapshot_regions`, `pending_create_peers`, peer garbage collection, durable merge/snapshot races.
-- **Core flow:** every peer lifecycle operation becomes a durable state transition -> restart rebuilds in-memory peers from that state -> recovery resumes unfinished work safely.
-- **Deferred:** none; this is the code-oriented lifecycle reference chapter.
+- **Depends on:** replica movement from 602; snapshots and Region-worker application from 603 and 703; split metadata from 604; normal merge coordination from 801.
+- **Introduces:** `RaftLocalState`, `RaftApplyState`, durable `PeerState`, startup reconstruction, `snapshot_raft_state_key`, `pending_snapshot_regions`, `pending_create_peers`, `atomic_snap_regions`, and merge recovery by target identity.
+- **Core flow:** normal lifecycle work persists a peer record -> startup rebuilds or resumes from that record -> a snapshot uses a KV-engine marker to bridge its Raft-engine write -> short-lived guards serialize overlapping live transitions -> a saved `Merging` state records the target epoch and peer ID that recovery uses to continue or remove the source.
+- **Deferred:** exact startup cleanup tasks, peer-GC triggers, per-map lock ordering, and version-specific recovery edge cases.
