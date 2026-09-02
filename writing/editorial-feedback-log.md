@@ -4,6 +4,60 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-09-02 11:11 CST - Keep the Preface Opening Natural and Move Brevity Into Scope
+
+`Scope` gives the disclaimer a useful boundary, but `How to Read This Book` over-structures a short, naturally flowing introduction. The statement that this is not a long book is not reading guidance; it describes the book's deliberate content boundary and belongs beside the decision to cover core ideas rather than every part of TiKV.
+
+Removed the unnecessary reading-method heading so the purpose, understanding-first approach, and Level Map flow directly. Moved the concise-length statement into `Scope` and separated the unofficial status, deliberate brevity, and work-in-progress status into three clear paragraphs.
+
+## 2026-09-02 11:06 CST - Give the Preface Opening Clear Structural Boundaries
+
+The opening Preface content is useful, but six loose paragraphs make its roles hard to distinguish. The book's purpose and motivation, the guidance for reading it, and the disclaimer about scope should not appear as one uninterrupted stream. In particular, the disclaimer needs a visible boundary so it reads as the book's scope rather than an afterthought.
+
+Kept the opening wording unchanged and organized it into the initial purpose, `How to Read This Book`, and `Scope`. The existing FAQ remains a separate section, producing a clear purpose -> reading approach -> scope -> FAQ progression.
+
+## 2026-09-02 11:04 CST - Make the Final FAQ Describe the Actual AI Writing Workflow
+
+The final Preface FAQ should explain why end-to-end AI generation was not sufficient for this book rather than merely divide authorship credit. The central mismatch is explanatory judgment: generated text often does not feel natural or digestible and differs from how the author thinks the ideas should be presented. Concrete failure modes include premature concepts, rushed details, repetition, low-value diagrams, implementation lists without intuition, and losing the big picture. The actual workflow is iterative and hands-on: use an initial draft to refresh the concepts, then write the outline and sentence skeletons, ask an agent to fill in language, and edit sentence by sentence.
+
+Replaced the entire answer to `Was this book AI-generated?` with the supplied three-paragraph account. Removed the previous prompt joke, verification aside, and authorship summary so the FAQ has one coherent explanation centered on maximizing human understanding.
+
+## 2026-09-02 11:02 CST - State the Preface's Deliberate Brevity
+
+The Preface should tell readers early that this is intentionally not a long book: its text is minimized to remain digestible for humans. The direct-code-reading FAQ already says AI-assisted exploration can become fragmented and detail-oriented, so the additional example about understanding one function without seeing the whole system is unnecessary repetition.
+
+Added the concise-length statement between the learning-path introduction and the Level Map link. Removed the repeated function-or-code-path sentence from the FAQ while keeping its larger point about fragmented code exploration.
+
+## 2026-09-01 21:56 CST - Restore Semantic Markdown in the Preface
+
+Replacing the Preface text must not silently discard useful Markdown semantics. The earlier emphasis on the book prioritizing understanding should remain visible, the Level Map is a real destination and should link to that page, and a literal example prompt should render as code rather than blend into the sentence. Similar reader-facing distinctions should be represented by the appropriate Markdown instead of plain text.
+
+Restored the bold understanding statement, linked `Level Map` to its mdBook page, and marked the example AI prompt as inline code. Rebuilt the book and checked the generated HTML to confirm that all three render with the intended semantics.
+
+## 2026-09-01 21:53 CST - Ground RAFTSTORE 901's Opening and Add-Peer Example
+
+RAFTSTORE 901 should present its earlier chapters as an explicit prerequisite list rather than compressing five references into one sentence. In the add-peer example, every message must have a visible origin and destination: saying "the message" identifies an uninitialized peer is abstract when the reader has not been told exactly which event causes Store 4 to create it. The closing lifecycle rule is also too abstract; the example should state directly that a tombstone prevents a delayed Raft message from recreating a removed peer.
+
+Replaced the opening reference paragraph with a three-item prerequisite section. Reworked the Peer 104 sequence around the first Raft message sent by the leader to Store 4, explained exactly what Store 4 knows and lacks after creating the uninitialized peer, and replaced the abstract lifecycle rule with the concrete delayed-message purpose of the tombstone.
+
+## 2026-09-01 21:41 CST - Replace the Preface With a Reader-Facing Introduction and FAQ
+
+The Preface should quickly give the reader a map: TiKV is large, code reading without the bigger picture is disorienting, and the levels provide a gradual path without requiring everything to be understood at once. It should clearly state that the book is the author's evolving view rather than official or exhaustive documentation. The discussion of human understanding, direct code reading, fragmented AI-assisted exploration, and the book's writing process belongs in a concise FAQ rather than a long uninterrupted reflection.
+
+Replaced the previous Preface with the author's supplied version. Added only the Markdown hierarchy for the Preface, FAQ, and individual questions; preserved the supplied wording and organized it as the new reader-facing opening.
+
+## 2026-08-31 21:23 CST - Restore the Concrete Lifecycle Insights in RAFTSTORE 901
+
+RAFTSTORE 901 originally carried valuable examples and corner cases from code reading: an add-peer followed by removal, the split crash matrix, two different paths creating the same split child, split racing with destroy, stale-peer garbage collection, target snapshots racing with an unfinished merge, peer-generation changes, and the ordering behind consecutive merges. Reducing these to durable records and three guard names made the chapter cleaner but also ground away its distinct value. These examples are not redundant retellings of normal snapshot, split, and merge paths; they explain why the lifecycle state and guards exist.
+
+Kept the clearer durable-record and cross-engine recovery structure, then restored the concrete Region 10 and Peer 104 example, snapshot/removal ordering, R10/R20 crash matrix, Peer 3 and Peer 1003 two-path race, split-versus-destroy outcomes, peer-GC triggers, same-generation and next-generation merge snapshot decisions, and consecutive-merge safety. Verified the mechanisms against the local TiKV source, expanded the 901 concept map, and added a durable editing rule that advanced author-derived corner cases must be organized rather than flattened away.
+
+## 2026-08-31 14:36 CST - Give the Book a Criterion for Understanding TiKV
+
+The preface should name a problem that becomes sharper in the AI world: answers to individual questions are easy to obtain, but understanding can become fragmented. It is easy to get attached to particular details without seeing the big picture, and hard to establish a criterion that says, "if I have figured these things out, I have grasped the essence of TiKV." This book is about building that sort of thing.
+
+Added this idea directly after the distinction between checking coding details and building mental models. Kept the author's wording and direct tone while fixing the grammar and connecting the fragmented-answer problem to the book's purpose.
+
 ## 2026-08-30 23:17 CST - Make RAFTSTORE 901 Add Only Recovery Boundaries
 
 RAFTSTORE 901 should build on the normal replica, snapshot, split, and merge paths already explained in 602 through 604, 703, and 801. Repeating those paths makes the chapter broad but not additive. Its distinct value is the durable state that survives a restart, the one cross-engine snapshot boundary, the in-memory guards that serialize overlapping transitions, and the narrow merge-recovery decision.

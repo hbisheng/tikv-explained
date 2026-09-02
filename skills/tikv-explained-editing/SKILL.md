@@ -30,6 +30,7 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Keep the flow natural and make each idea clear at a glance. Use short sections when a concept needs its own mental boundary.
 - Use `---` only to separate a completed local mechanism from a chapter-level takeaway or forward pointer. Do not use it as decoration or between ordinary sections.
 - Make every section and chapter add a distinct step, decision, or boundary. Keep recaps only when they establish the problem for new material; do not repeat earlier content without moving the reader's understanding forward.
+- In advanced chapters, do not flatten author-derived examples, crash cases, or concurrency races into abstract mechanism summaries merely because the normal path was covered earlier. Keep the concrete case when it carries the chapter's distinct insight; use the abstraction to organize it, not replace it.
 - In a multi-component flow, name which component performs each action. Distinguish a logical operation or plan from the physical access path that implements it.
 - When explaining a protocol optimization, state what correctness evidence replaces the removed step. Distinguish the point where the logical outcome becomes final from later cleanup or materialization work.
 - Leave configurable defaults, version history, and tuning values out of introductory explanations unless they change the mental model being built.

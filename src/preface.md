@@ -1,27 +1,56 @@
 # Preface
 
-The purpose of this book is simple: to help you build a systematic understanding of TiKV. That means building a mental model that truly reflects its internal mechanisms.
+The purpose of this book is simple: to help you build a systematic understanding of TiKV. That means building a mental model that truly reflects how it works internally.
 
-**The book prioritizes understanding**. The chapters start with the most accessible ideas and gradually build toward concepts that require more background. Think of it as climbing a mountain, one level at a time. Don't be daunted by its height. This book will guide you every step of the way.
+TiKV is a large system. It is easy to jump into a component, read hundreds of lines of code, and still not know where you are in the bigger picture. This book tries to give you the map first.
 
-This book is meant for humans to read. Coding agents are becoming extraordinarily efficient at producing code and comments, which makes accurate mental models more important, not less. With the right model, you know the expected behavior of the system and can go as deep as needed. It becomes easier to extend, debug, and build upon, much like working from a specification.
+**The book prioritizes understanding.** The text has been kept as concise as possible to make it digestible for humans. The chapters start with the most accessible ideas and gradually build toward concepts that require more background. Think of it as climbing a mountain, one level at a time. Don't be daunted by its height. This book will guide you every step of the way.
 
-Coding details can now be checked easily by coding agents. What is more important for humans is to get the big picture and build the mental models.
+The [Level Map](level-map.md) shows the path ahead and how the ideas build on one another. That is where the journey begins.
 
-I assumed documents like this could easily be written by AI, but after trying various approaches, I am still not satisfied. What agents produce out of the box often does not read naturally. The logical flow can be messed up. Sometimes they spend time explaining that something is not X instead of grasping the essence. They bring in a concept without an introduction and assume the reader already knows it. I tried to list all these problems in an editing skill. It improved the results a bit, but they are still not satisfactory.
+## Scope
 
-Agent drafts also tend to be redundant and repetitive. I want the book to introduce things gradually, with each chapter adding something new. Instead, a draft may repeat a bunch of what earlier chapters have already discussed without bringing in useful information. I have had to keep asking agents to delete large parts of the text.
+This is not official TiKV documentation. It represents the author's view and focuses on the core ideas rather than every part of TiKV.
 
-I believe less is more. This book does not try to contain every detail. It tries to contain the core ideas. Further details can be looked up in the code. Given that, the book is a developing piece, and new material can be added over time.
+It is a work in progress and will continue to evolve.
 
-Sometimes a draft just does not feel right. I can give four or five rounds of instructions, and it still does not feel right. At that point, I may as well abandon the whole AI draft and write the skeleton of the sentences myself. I use my own brain to state the outline and logical flow, then ask an agent to fill in the details and turn the outline into grammatically correct sentences. Even then, some expressions do not read naturally or make the idea clear at a glance, so I still need to edit the text by hand, sentence by sentence. I also verify its accuracy by checking the code, often with another agent.
+## FAQ
 
-The other problem with letting an agent write everything is that there is no review or audit of its accuracy. This book is a curated summary reviewed by a TiKV developer, so at least it has a higher level of accuracy than an unaudited agent draft. But I also have to admit that the current content may still contain inaccuracies. In particular, the details are not listed 100% exhaustively. I think that once these mental models are in place, it becomes much easier to ask an agent to look up the exact code details.
+### Who is this book for?
 
-Agents do not seem to understand what is easy and what is difficult for a human reader, what is the essence, and what is unnecessary to state in a document. For a book that aims to maximize understanding instead of just providing a technical reference, this makes it hard to write with unsupervised agents. There is not much need for another technical reference now that an agent can read the code directly. Agents do not seem to get what is hard for the human brain.
+Anyone interested in understanding how TiKV works.
 
-Or maybe they simply see things differently from me. I built this book to convey what I think and the way I see TiKV.
+### Why bother with human understanding when coding agents can write code and solve issues on their own?
 
-I guess agents are not as good at writing documents and books as they are at writing code. Of course, they may become better in the future, and I would love to see that. I could then use them to learn a new field systematically much faster.
+Humans are not completely out of the software development cycle - yet.
 
-The learning order is a recommendation, not a requirement. The levels only indicate a suggested learning order. Chapters near the peak are not necessarily much harder; they may simply require more background context to fully grasp. Treat the book as a map: start anywhere, jump around, and use whatever tools or methods help you learn. There is no single right way to learn.
+As coding agents become more capable, understanding every detail of a particular piece of code may matter less and less. But mental models matter more, not less.
+
+With the right model, you know how the system is expected to behave, where to look when something goes wrong, and how to extend, debug, or build upon it - much like working from a specification. It also helps you work better with AI: you can ask better questions to get better answers.
+
+And when the day comes that coding agents completely take over, understanding the code will become a human hobby.
+
+### Why not just read the TiKV code directly?
+
+You should. No learning material, including this book, can replace reading the code.
+
+But TiKV is a large repository, and reading it without a map can be difficult. AI makes code exploration much easier, but the experience can still feel fragmented and too detail-oriented.
+
+This book provides the big picture and a step-by-step roadmap. Once you have the mental model, you can return to the code and use AI to fill in the details.
+
+### Was this book AI-generated?
+
+I hoped a prompt like `Give me a book about TiKV` would be enough, but it simply wasn't.
+
+I tried tweaking prompts and skills and letting AI generate the text end to end. But more often than not, the result didn't feel natural or easy to digest. Maybe that's because I already have the mental model in my head and am very opinionated about how to present it. My goal is to maximize understanding for human readers.
+
+Common issues in AI-generated drafts include:
+
+- introducing concepts too early;
+- jumping into details too quickly;
+- repeating ideas;
+- using diagrams that add little;
+- listing implementation details without intuition;
+- losing the big picture in the code.
+
+So the typical workflow is this: I throw in some keywords and concepts, and AI generates a draft. I read it and find myself very unhappy. After four or five rounds of prompting, I give up on the draft, but at least I get a refresh of the relevant concepts. I then write the outline and sentence skeletons myself, ask an agent to fill in the language, and edit the result by hand, sentence by sentence.
