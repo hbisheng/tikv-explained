@@ -1,6 +1,6 @@
 ---
 name: tikv-explained-editing
-description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edits the TiKV Explained book, mdBook config, SUMMARY.md, repo AI rules, title/positioning, or converts TiKV Mountain notes into chapters. Keep chapters sparse, direct, level-ordered, and validated with mdbook build.
+description: Editing rules for the TiKV Explained repository. Use when Codex edits the book, mdBook config, SUMMARY.md, repo AI rules, title/positioning, or converts TiKV Mountain notes into chapters. Keep chapters sparse, direct, level-ordered, and validated with mdbook build.
 ---
 
 # TiKV Explained Editing
@@ -13,7 +13,7 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Treat agent-generated technical prose as unreviewed until its claims have been checked against the implementation and the chapter has been curated as a whole.
 - Before drafting or substantially revising a chapter, consult and update `writing/chapter-concept-map.md`. For every chapter, record its dependencies, concepts introduced, core flow, and deferred details.
 - Do not commit generated `book/`.
-- Keep the repo private and do not push unless the user explicitly asks.
+- Do not push unless the user explicitly asks.
 - Use specific commit messages. The subject must state the kind of change and the affected chapter or area; for multi-chapter or structural changes, add a commit body that lists the main chapters/files and the substantive change. Avoid generic messages such as `Develop`, `Update`, or `Refine` without that context.
 
 ## Writing
@@ -62,5 +62,5 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - If editing this skill, run:
 
 ```sh
-python3 /home/bishengh/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/tikv-explained-editing
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" skills/tikv-explained-editing
 ```

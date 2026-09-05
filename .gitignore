@@ -2,4 +2,4 @@ book/
 *.swp
 *.swo
 .DS_Store
-
+127.0.0.1:*

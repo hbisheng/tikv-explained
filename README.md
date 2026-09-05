@@ -4,6 +4,10 @@ Mental models for understanding TiKV from the ground up.
 
 This repository contains the source for the book **TiKV Explained: Mental Models from the Ground Up**. It is built with [mdBook](https://rust-lang.github.io/mdBook/).
 
+Read the book at [hbisheng.github.io/tikv-explained](https://hbisheng.github.io/tikv-explained/).
+
+The book is a work in progress. Corrections and suggestions are welcome through GitHub Issues.
+
 ## Local Workflow
 
 Build the static book:
