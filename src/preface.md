@@ -4,7 +4,7 @@ The purpose of this book is simple: to help you build a systematic understanding
 
 TiKV is a large system. It is easy to jump into a component, read hundreds of lines of code, and still not know where you are in the bigger picture. This book tries to give you the map first.
 
-**The book prioritizes understanding.** The text has been kept as concise as possible to make it digestible for humans. The chapters start with the most accessible ideas and gradually build toward concepts that require more background. Think of it as climbing a mountain, one level at a time. Don't be daunted by its height. This book will guide you every step of the way.
+**The book prioritizes human understanding.** The text has been kept as concise as possible to make it digestible for humans. The chapters start with the most accessible ideas and gradually build toward concepts that require more background. Think of it as climbing a mountain, one level at a time. Don't be daunted by its height. This book will guide you every step of the way.
 
 The [Level Map](level-map.md) shows the path ahead and how the ideas build on one another. That is where the journey begins.
 
@@ -46,11 +46,9 @@ I tried tweaking prompts and skills and letting AI generate the text end to end.
 
 Common issues in AI-generated drafts include:
 
-- introducing concepts too early;
-- jumping into details too quickly;
-- repeating ideas;
-- using diagrams that add little;
-- listing implementation details without intuition;
-- losing the big picture in the code.
+- bringing up concepts without a proper introduction;
+- listing implementation details without giving intuition;
+- focusing on details and losing the big picture in the code;
+- being dull, repetitive, and unfocused.
 
-So the typical workflow is this: I throw in some keywords and concepts, and AI generates a draft. I read it and find myself very unhappy. After four or five rounds of prompting, I give up on the draft, but at least I get a refresh of the relevant concepts. I then write the outline and sentence skeletons myself, ask an agent to fill in the language, and edit the result by hand, sentence by sentence.
+So the typical workflow is this: I throw in some keywords and concepts, and AI generates a draft. I read it and find myself very unhappy. After four or five rounds of prompting, I give up on the draft, but at least I get a refresh of the relevant concepts. I then write the outline and sentence skeletons myself, verify the ideas against the code when needed, and ask an agent to get the grammar right or fill in the language. I then review and edit the result sentence by sentence.

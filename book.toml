@@ -3,7 +3,7 @@ authors = ["Bisheng Huang"]
 language = "en"
 multilingual = false
 src = "src"
-title = "TiKV Explained: Mental Models and Mechanisms"
+title = "TiKV Explained: Mental Models from the Ground Up"
 
 [build]
 build-dir = "book"

@@ -4,6 +4,60 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-09-05 22:13 CST - Name the Book Around Its Learning Method
+
+The title should describe the book's central promise without presenting mental models and mechanisms as two competing abstractions. `TiKV Explained: Mental Models from the Ground Up` captures both the goal of building understanding and the gradual, first-principles order reflected in the level map.
+
+Updated the mdBook title, browser-title customization, README description, and license attribution to use the new title consistently.
+
+## 2026-09-05 22:04 CST - Derive Snapshot Application from Stale Data in RAFTSTORE 703
+
+The snapshot-application section should start from its actual storage problem: installing SST files does not by itself replace a Region's local contents. Range reservation prevents conflicting Region ownership but does not remove physical data left by a destroyed peer. The chapter should therefore derive the required order of overlapping cleanup and SST ingestion, use a concrete `{a, b}` versus `{a, c}` example, preserve the separate constraint imposed by existing readers, and defer the broader L0 pressure explanation to ROCKSDB 704.
+
+Reworked the section around that chain. It now separates range admission from physical cleanup, lists the delete-before-ingest sequence, and explains both stale-key retention and delayed-deletion hazards. It retains the RocksDB snapshot constraint on whole-file deletion, states how normal writes are excluded while cleanup and ingestion are serialized, and links L0 ingestion delay directly to the flow-control section in ROCKSDB 704.
+
+## 2026-09-05 21:41 CST - Center Merge Recovery on Durable Handoffs in RAFTSTORE 901
+
+The merge section should connect the normal flow from RAFTSTORE 801 to lifecycle recovery without repeating the full protocol. It should explain what the source's `Merging` state preserves, why the target waits for the local source's apply work to stop, and why persisting the expanded target and source tombstone in one KV-engine batch is the durable transfer point. A leftover source should then decide whether to wait or destroy itself from the recorded merge target and its epoch, not from range overlap alone. For snapshot recovery, first distinguish snapshots from before and after the merge. Then distinguish the same target peer, which requires atomic source deletion and target recovery metadata, from a replacement peer that cannot replay the old target's `CommitMerge`. Finally, explain why B can absorb A and later merge into C without persisting the complete merge chain: every peer must first replicate and report the earlier merge committed, after which Raft apply order preserves the sequence.
+
+Reworked the merge flow around those persistence boundaries. The source now records the target and required log interval while frozen; the target waits for local catch-up before atomically persisting both Region-state changes. The lagging-merge case now compares the local target with the recorded merge point: an unchanged target may still need the source, while a later split can advance the target's epoch and prove that the old merge path has moved on, permitting cleanup even without current range overlap. The snapshot race now uses Region version to identify a post-merge snapshot, explains the `atomic_snap_regions` batch for the same target peer, and shows why a larger replacement peer ID removes the risk of replaying the old `CommitMerge`. The merge-history section now uses A -> B -> C to connect proposal checks with Raft apply order, then closes the chapter by relating tombstones, atomic metadata batches, and in-memory guards to restart-safe lifecycle transitions.
+
+## 2026-09-05 21:35 CST - Separate the Split Races in RAFTSTORE 901
+
+The split-and-creation race should begin with a concrete parent and child: Peer 3 of R0 is still waiting for a pre-split snapshot when R0 creates R1 and Peer 1003. Peer 1003 can then be initialized through the parent's snapshot and split, or independently through a Raft message and its own snapshot. Creating an empty child first does not settle the race. The explanation must distinguish coordination between overlapping snapshots from coordination over which path may publish the child peer. The related split-and-deletion race should start from the same empty child and show how the shared lock prevents split from recreating a deleted peer or deletion from erasing a peer that split has just created.
+
+Reworked the creation section around those two paths. `pending_snapshot_regions` now explains why the parent and child snapshots cannot install overlapping ranges together. `pending_create_peers` and the `StoreMeta` lock explain why split may replace the expected empty peer, while delayed message-based creation cannot overwrite an initialized child or a newer peer generation. The replaced peer's metadata check against `StoreMeta` now explains how its stale snapshot is rejected. Rebuilt the deletion race as two lock orderings: destruction persists its tombstone before split checks, or split claims replacement before destruction performs persistent cleanup. The split-first child is left to the earlier peer-GC mechanism.
+
+## 2026-09-05 21:22 CST - Make Peer Split's Persistence Point Concrete in RAFTSTORE 901
+
+The peer-split section should show what the Apply FSM writes for the existing Region and new Region, then make the KV-engine batch the explicit split persistence point. Its crash matrix should distinguish an uncommitted entry, a committed but unapplied entry, the atomic apply batch, and the gap before the Peer FSM handles the result. The exact initial index and term are implementation details that do not help explain this boundary and should be omitted.
+
+Rebuilt the section around R0 becoming R0 and R1, listing both `RegionLocalState` records and both `RaftApplyState` updates in the atomic KV batch. Removed the fixed initial-state constants, their reconstruction details, and the corresponding crash-matrix case so the section remains focused on the durable topology change. Updated the concept map accordingly.
+
+## 2026-09-05 20:36 CST - Use the Real Snapshot-Deletion Race Boundary in RAFTSTORE 901
+
+The race between peer snapshot application and deletion should follow the simple logical architecture instead of expanding into `Ready` collection, polling, and message-batch details. The meaningful comparison is between the Peer FSM beginning peer destruction and beginning snapshot persistence. If destruction starts first, it wins. If snapshot persistence starts first, destruction normally waits, except when the Region-worker task is still in a cancelable window.
+
+Reduced the section to the two serialized outcomes and kept task cancellation as a narrow exception to the snapshot-first path. It now makes the concurrency boundary explicit: after scheduling, the Region-worker task runs independently of the Peer FSM; cancellation can complete immediately before the task starts, but a running task must stop safely or finish before destruction. The correctness reason remains explicit: deletion cannot leave a tombstone while snapshot application can still overwrite `RegionLocalState` with `Normal`. Updated the reusable rule to require the true boundary at the highest useful abstraction, without unnecessary polling details.
+
+## 2026-09-05 17:19 CST - Separate the Three Peer-Deletion Questions in RAFTSTORE 901
+
+Peer deletion in RAFTSTORE 901 should answer three different questions in order instead of mixing them together: how a peer deletes itself after applying a configuration change, how an orphaned peer discovers removal when it never applies that entry, and exactly what tombstone information remains afterward. Orphan detection includes contacting replicas, receiving a message addressed to a newer peer generation, and checking with PD when ordinary Raft traffic can no longer settle the question. Losing the leader alone is not proof of removal; the peer may simply be waiting to reconnect. The final tombstone distinction matters: a peer that applied removal has the new epoch and excludes itself, a peer garbage-collected earlier retains old metadata including itself, and a never-initialized peer has only its own identity under a zero epoch.
+
+Rebuilt the deletion section as `Configuration-Change Deletion`, `Orphaned Peer GC`, and `What Is Persisted After Deletion`. The normal path now states the tombstone persistence point and subsequent cleanup directly; the orphan path distinguishes evidence from normal Raft traffic from the authoritative PD fallback; and a table shows how epoch and peer-list contents differ across the three cases. The closing explanation connects those records to epoch checks and peer-ID generation checks for rejecting delayed messages.
+
+## 2026-09-05 14:06 CST - Make RAFTSTORE 901's Persistence Boundaries Explicit
+
+RAFTSTORE 901 should be named `Peer Lifecycle and Crash Recovery`, because crash recovery is the point of its durable-state discussion. Peer creation must say plainly that an uninitialized peer exists only in memory and vanishes on restart. Snapshot application must identify both the exact persistence point and the components around it: the Peer FSM obtains an accepted snapshot through Raft `Ready`, the store writer persists KV-engine state before Raft-engine state, and only then does the Peer FSM submit data application to the Region worker. Peer deletion needs the same treatment: distinguish the Apply FSM's durable tombstone write from the Peer FSM's later cleanup, explain what remains for initialized and uninitialized peers, and separate orphaned-peer cleanup from the normal removal path.
+
+Renamed 901 throughout the book and rewrote its snapshot-application and deletion sections around their persistence boundaries. The snapshot path now follows `raft-rs`, `Ready`, the Peer FSM, store writer, and Region worker through both engine writes and both completion notifications. The deletion path identifies the tombstone as durable before later cleanup and explains how a retained peer ID rejects stale generations. Added a general editing rule requiring crash-recovery explanations to name their first durable write and recovery signal.
+
+## 2026-09-05 12:03 CST - Organize RAFTSTORE 901 by Lifecycle and Race Boundaries
+
+RAFTSTORE 901 should not mix peer creation, snapshot application, deletion, crash recovery, and cross-operation races under broad sections. Its structure should follow the lifecycle itself: peer creation, snapshot application and its durable handoff, deletion with peer garbage collection, and the creation/deletion race; then split, split crash recovery, split/creation race, and split/deletion race; then merge flow, merge/snapshot race, and merge history. Normal behavior must be established before the corner case that depends on it.
+
+Reorganized 901 into those explicit boundaries without removing its concrete examples. Moved peer GC into deletion, separated snapshot application from creation, split the normal peer-split transition from its crash matrix and two races, restored the merge flow before its recovery cases, and renamed the final sections around merge/snapshot interaction and merge history. Updated the concept map and editing skill to preserve this normal-flow -> recovery -> race organization in later advanced chapters.
+
 ## 2026-09-02 11:11 CST - Keep the Preface Opening Natural and Move Brevity Into Scope
 
 `Scope` gives the disclaimer a useful boundary, but `How to Read This Book` over-structures a short, naturally flowing introduction. The statement that this is not a long book is not reading guidance; it describes the book's deliberate content boundary and belongs beside the decision to cover core ideas rather than every part of TiKV.
@@ -18,9 +72,9 @@ Kept the opening wording unchanged and organized it into the initial purpose, `H
 
 ## 2026-09-02 11:04 CST - Make the Final FAQ Describe the Actual AI Writing Workflow
 
-The final Preface FAQ should explain why end-to-end AI generation was not sufficient for this book rather than merely divide authorship credit. The central mismatch is explanatory judgment: generated text often does not feel natural or digestible and differs from how the author thinks the ideas should be presented. Concrete failure modes include premature concepts, rushed details, repetition, low-value diagrams, implementation lists without intuition, and losing the big picture. The actual workflow is iterative and hands-on: use an initial draft to refresh the concepts, then write the outline and sentence skeletons, ask an agent to fill in language, and edit sentence by sentence.
+The final Preface FAQ should explain why end-to-end AI generation was not sufficient for this book rather than merely divide authorship credit. The central mismatch is explanatory judgment: generated text often does not feel natural or digestible and differs from how the author thinks the ideas should be presented. The recurring problems are concepts without proper introduction, implementation details without intuition, fixation on details that loses the big picture, and prose that is dull, repetitive, and unfocused. The actual workflow is iterative and hands-on: use an initial draft to refresh the concepts, then write the outline and sentence skeletons, ask an agent to fill in language, and edit sentence by sentence.
 
-Replaced the entire answer to `Was this book AI-generated?` with the supplied three-paragraph account. Removed the previous prompt joke, verification aside, and authorship summary so the FAQ has one coherent explanation centered on maximizing human understanding.
+Replaced the entire answer to `Was this book AI-generated?` with the supplied account and kept its explanation centered on maximizing human understanding. Tightened the issue list to the four recurring failures above instead of splitting closely related problems into a longer catalog.
 
 ## 2026-09-02 11:02 CST - State the Preface's Deliberate Brevity
 

@@ -9,7 +9,6 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 
 - Follow `AGENTS.md`.
 - Keep `src/` reader-facing. Put guides, AI notes, and process docs outside the book.
-- When verifying TiKV mechanics for book text, use the local checkout at `/data/ssd1/tikv` first. Use upstream web sources only as a fallback or cross-check.
 - When a chapter describes a specific release, verify cross-component behavior against that release rather than current `master`; do not mix later APIs into the earlier-release narrative.
 - Treat agent-generated technical prose as unreviewed until its claims have been checked against the implementation and the chapter has been curated as a whole.
 - Before drafting or substantially revising a chapter, consult and update `writing/chapter-concept-map.md`. For every chapter, record its dependencies, concepts introduced, core flow, and deferred details.
@@ -31,6 +30,10 @@ description: Editing rules for /home/bishengh/tikv-explained. Use when Codex edi
 - Use `---` only to separate a completed local mechanism from a chapter-level takeaway or forward pointer. Do not use it as decoration or between ordinary sections.
 - Make every section and chapter add a distinct step, decision, or boundary. Keep recaps only when they establish the problem for new material; do not repeat earlier content without moving the reader's understanding forward.
 - In advanced chapters, do not flatten author-derived examples, crash cases, or concurrency races into abstract mechanism summaries merely because the normal path was covered earlier. Keep the concrete case when it carries the chapter's distinct insight; use the abstraction to organize it, not replace it.
+- When an advanced chapter combines a normal lifecycle, crash recovery, and races with other operations, separate those concerns into explicit sections. Establish the normal transition first, then explain its recovery boundary and each cross-operation race.
+- When explaining crash recovery, identify the first durable write explicitly. State what it records, which later work may still be missing, and how startup detects and resumes that incomplete transition.
+- Distinguish a physically persisted record from a logical default reconstructed when that record is absent. Do not describe reconstructible initial state as an immediate engine write.
+- When explaining a race, identify the exact serialization or persistence boundary that decides the outcome. State it at the highest useful level; do not narrate polling or batching mechanics unless they change the reader's conclusion. Distinguish cancellation from completion only when that difference matters.
 - In a multi-component flow, name which component performs each action. Distinguish a logical operation or plan from the physical access path that implements it.
 - When explaining a protocol optimization, state what correctness evidence replaces the removed step. Distinguish the point where the logical outcome becomes final from later cleanup or materialization work.
 - Leave configurable defaults, version history, and tuning values out of introductory explanations unless they change the mental model being built.

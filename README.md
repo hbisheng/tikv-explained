@@ -1,8 +1,8 @@
 # TiKV Explained
 
-Mental models and mechanisms for understanding TiKV.
+Mental models for understanding TiKV from the ground up.
 
-This repository contains the source for the book **TiKV Explained: Mental Models and Mechanisms**. It is built with [mdBook](https://rust-lang.github.io/mdBook/).
+This repository contains the source for the book **TiKV Explained: Mental Models from the Ground Up**. It is built with [mdBook](https://rust-lang.github.io/mdBook/).
 
 ## Local Workflow
 

@@ -1,4 +1,4 @@
-const bookTitle = "TiKV Explained: Mental Models and Mechanisms";
+const bookTitle = "TiKV Explained: Mental Models from the Ground Up";
 const titleSuffix = ` - ${bookTitle}`;
 
 if (document.title.endsWith(titleSuffix)) {
