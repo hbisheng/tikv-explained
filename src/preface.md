@@ -1,6 +1,6 @@
 # Preface
 
-The purpose of this book is simple: to help you build a **systematic understanding** of TiKV. That means building a mental model of its major components, the mechanisms behind them, and how they fit together.
+The purpose of this book is simple: to help you build a **systematic understanding** of [TiKV](https://github.com/tikv/tikv). That means building a mental model of its major components, the mechanisms behind them, and how they fit together.
 
 TiKV is a large system with more than 550,000 lines of Rust. Without the big picture, it is easy to get lost in the code. This book tries to give you that map first.
 
@@ -10,9 +10,9 @@ The [Level Map](level-map.md) shows the path ahead and how the ideas build on on
 
 ## Scope
 
-This is not official TiKV documentation. It represents the author's view and focuses on the core ideas rather than every part of TiKV.
+This is not official TiKV documentation. For official information, see the [TiKV website](https://tikv.org/) and [TiKV repository](https://github.com/tikv/tikv).
 
-It is a work in progress and will continue to evolve.
+This book represents the author's view and focuses on the core ideas rather than every part of TiKV. It is a work in progress and will continue to evolve.
 
 ## FAQ
 

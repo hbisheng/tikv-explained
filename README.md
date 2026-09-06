@@ -8,6 +8,11 @@ Read the book at [hbisheng.github.io/tikv-explained](https://hbisheng.github.io/
 
 The book is a work in progress. Corrections and suggestions are welcome through GitHub Issues.
 
+## Related Links
+
+- [Official TiKV website](https://tikv.org/)
+- [TiKV source code](https://github.com/tikv/tikv)
+
 ## Local Workflow
 
 Build the static book:
