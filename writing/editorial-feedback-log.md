@@ -4,6 +4,12 @@ This internal log records editorial feedback and the resulting changes. It is no
 
 Entries are newest first. Each entry has two plain paragraphs: the user's distilled intent, then the resulting changes. Durable rules belong in `skills/tikv-explained-editing/SKILL.md`, not here.
 
+## 2026-09-08 10:48 CST - Clarify Batched Raft Input and the Human Bottleneck
+
+RAFTSTORE 402 should not introduce proposals as an abrupt aside before the reader understands `step`. It should first establish that `step` handles Raft messages between peers, then explain at the end of that section that new writes use the similar `propose` API to feed information into Raft's internal state. The event loop must also not imply that TiKV feeds exactly one message and immediately retrieves one `Ready`; several messages can be processed before their work is collected. In the Preface, the motivation should be sharper: TiKV is mission-critical, generated code is becoming cheaper, and the production bottleneck is increasingly the speed of full understanding. If agents ever take over responsibly, code understanding may become a human hobby. The AI-writing issue list should also admit its simplest recurring failure first: generated drafts are often just too long.
+
+Moved the proposal explanation to the end of the `step` section, named `propose` directly, and made the several-messages-to-one-`Ready` boundary explicit throughout the 402 loop and concept map. Reframed the Preface around responsible review of mission-critical code, the growing understanding bottleneck, and the conditional future of autonomous delivery, then added excessive length as the first issue in the AI-generated-draft list. Added a reusable rule against presenting batched APIs as one-input-to-one-output flows.
+
 ## 2026-09-05 22:13 CST - Name the Book Around Its Learning Method
 
 The title should describe the book's central promise without presenting mental models and mechanisms as two competing abstractions. `TiKV Explained: Mental Models from the Ground Up` captures both the goal of building understanding and the gradual, first-principles order reflected in the level map.

@@ -35,7 +35,7 @@ Before writing a chapter, check its earlier dependencies. A term may be used wit
 
 - **Depends on:** Raft messages, log entries, and commit from 401; Raftstore from 301.
 - **Introduces:** `raft-rs`, `step`, `Ready`, `advance`, proposal API, peer FSM, state machine application.
-- **Core flow:** event -> `raft-rs` decision -> `Ready` -> TiKV performs I/O and application -> `advance`.
+- **Core flow:** one or more events -> `raft-rs` decisions -> one `Ready` batch -> TiKV performs I/O and application -> `advance`.
 - **Deferred:** storage engines, batching, and exact TiKV state-machine structures.
 
 ## ROCKSDB 403: RocksDB Intro

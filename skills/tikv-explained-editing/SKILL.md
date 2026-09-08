@@ -35,6 +35,7 @@ description: Editing rules for the TiKV Explained repository. Use when Codex edi
 - Distinguish a physically persisted record from a logical default reconstructed when that record is absent. Do not describe reconstructible initial state as an immediate engine write.
 - When explaining a race, identify the exact serialization or persistence boundary that decides the outcome. State it at the highest useful level; do not narrate polling or batching mechanics unless they change the reader's conclusion. Distinguish cancellation from completion only when that difference matters.
 - In a multi-component flow, name which component performs each action. Distinguish a logical operation or plan from the physical access path that implements it.
+- When explaining an event loop or batched API, do not imply a one-to-one relationship between inputs and output batches when several inputs can contribute to one batch. State the batching boundary explicitly.
 - When explaining a protocol optimization, state what correctness evidence replaces the removed step. Distinguish the point where the logical outcome becomes final from later cleanup or materialization work.
 - Leave configurable defaults, version history, and tuning values out of introductory explanations unless they change the mental model being built.
 - Avoid unnecessary summaries, meta narration, and obvious setup sentences.

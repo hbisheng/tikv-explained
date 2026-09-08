@@ -24,11 +24,11 @@ Anyone interested in understanding how TiKV works.
 
 Humans are not completely out of the software development cycle - yet.
 
-As coding agents become more capable, understanding every detail of a particular piece of code may matter less and less. But mental models matter more.
+TiKV is mission-critical software, so code should not be merged without a solid understanding. As coding agents make code generation cheaper and cheaper, the bottleneck in production becomes how quickly you can understand the code. That requires the right mental model.
 
 With the right model, you know how the system is expected to behave, where to look when something goes wrong, and how to extend, debug, or build upon it - much like working from a specification. It also helps you work better with AI: you can ask better questions to get better answers.
 
-And when the day comes that coding agents completely take over, understanding the code will become a human hobby.
+If the day ever comes when coding agents can completely take over and responsibly deliver code, understanding the code will become a human hobby.
 
 ### Why not just read the TiKV code directly?
 
@@ -46,6 +46,7 @@ I tried tweaking prompts and skills and letting AI generate the text end to end.
 
 Common issues in AI-generated drafts include:
 
+- simply being too long;
 - bringing up concepts without a proper introduction;
 - listing implementation facts without giving intuition or the big picture;
 - having a low signal-to-noise ratio, burying key insights in unnecessary text.
