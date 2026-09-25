@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="630" viewBox="0 0 630 630">
+  <rect width="630" height="630" fill="#fffdf7"/>
+  <rect x="18" y="18" width="594" height="594" rx="22" fill="none" stroke="#ded8ca" stroke-width="2"/>
+  <svg x="250" y="130" width="130" height="130" viewBox="0 0 64 64">
+
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#78917b"/>
+  <path d="M10 17c8-2 15-1 22 3 7-4 14-5 22-3v31c-8-2-15-1-22 3-7-4-14-5-22-3z"
+        fill="#fffdf7" stroke="#24292f" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 20v31" fill="none" stroke="#24292f" stroke-width="3"/>
+  <path d="M15 24c5-1 9-.5 12 1m-12 6c5-1 9-.5 12 1m10-7c3-1.5 7-2 12-1m-12 8c3-1.5 7-2 12-1"
+        fill="none" stroke="#78917b" stroke-width="2.2" stroke-linecap="round"/>
+
+  </svg>
+  <text x="315" y="398" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="78" font-weight="700">TiKV</text>
+  <text x="315" y="479" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="68" font-weight="700">Explained</text>
+</svg>
